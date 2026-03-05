@@ -10,13 +10,15 @@ Reads your session directly, scores it across 7 factors, and exposes the result 
 
 ```bash
 npm install -g driftguard-mcp
+driftguard-mcp setup
 ```
 
-Then add it to your AI CLI config.
+`setup` automatically configures all supported AI CLIs on your machine. Restart your AI CLI(s) after running it.
 
-### Claude Code
+<details>
+<summary>Manual config (if you prefer)</summary>
 
-Add to `~/.claude.json`:
+### Claude Code — `~/.claude.json`
 
 ```json
 {
@@ -28,11 +30,7 @@ Add to `~/.claude.json`:
 }
 ```
 
-Restart Claude Code. The `get_drift`, `get_handoff`, and `get_trend` tools are now available in every session.
-
-### Gemini CLI
-
-Add to `~/.gemini/settings.json`:
+### Gemini CLI — `~/.gemini/settings.json`
 
 ```json
 {
@@ -44,9 +42,7 @@ Add to `~/.gemini/settings.json`:
 }
 ```
 
-### Codex CLI
-
-Add to `~/.codex/config.json`:
+### Codex CLI — `~/.codex/config.json`
 
 ```json
 {
@@ -58,9 +54,7 @@ Add to `~/.codex/config.json`:
 }
 ```
 
-### Cursor
-
-Add to `~/.cursor/mcp.json`:
+### Cursor — `~/.cursor/mcp.json`
 
 ```json
 {
@@ -73,6 +67,8 @@ Add to `~/.cursor/mcp.json`:
 ```
 
 > Note: Cursor drift is calculated from any active Claude Code, Gemini CLI, or Codex CLI sessions on your machine — not from Cursor's own conversation history.
+
+</details>
 
 ---
 
@@ -129,7 +125,7 @@ Trend (last 8): ▁▃▅▆▇  +12 over 8 checks ↗
 
 ### `get_handoff()`
 
-Generates a structured handoff prompt. Summarises top topics, recent messages, and the last code block. Paste it into a new session to continue without losing context.
+Generates a structured handoff prompt. Summarises top topics, recent messages, and the last code block. Paste it into a new session in any supported AI CLI to continue without losing context.
 
 ### `get_trend()`
 
