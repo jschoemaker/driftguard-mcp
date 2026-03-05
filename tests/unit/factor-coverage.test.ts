@@ -43,6 +43,22 @@ describe('factor: contextSaturation', () => {
   });
 });
 
+  it('scores higher when messages carry toolTokens (tool-heavy session)', () => {
+    const withTools = conversation([
+      ['hi', 'hello'],
+      ['how are you', 'fine thanks'],
+    ]).map(m => ({ ...m, toolTokens: 5000 })); // simulate large tool call volume
+
+    const withoutTools = conversation([
+      ['hi', 'hello'],
+      ['how are you', 'fine thanks'],
+    ]);
+
+    const withScore    = calculateDrift(withTools, ZERO).factors.contextSaturation;
+    const withoutScore = calculateDrift(withoutTools, ZERO).factors.contextSaturation;
+    expect(withScore).toBeGreaterThan(withoutScore);
+  });
+
 // ── 2. topicScatter ───────────────────────────────────────────────────────────
 
 describe('factor: topicScatter', () => {

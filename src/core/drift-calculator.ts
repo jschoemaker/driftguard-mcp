@@ -110,7 +110,7 @@ function calcMessageDecay(messages: ChatMessage[]): number {
     const words = msg.content.split(/\s+/).filter(w => w.length > 0).length;
     const hasCode = msg.content.includes('```');
     const tokenEstimate = Math.round(words * 1.3 * (hasCode ? 1.5 : 1));
-    totalTokens += tokenEstimate;
+    totalTokens += tokenEstimate + (msg.toolTokens ?? 0);
   }
 
   if (totalTokens < 500) return 0;

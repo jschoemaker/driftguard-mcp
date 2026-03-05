@@ -147,6 +147,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     platform: 'claude' as const,
     tabId: 0,
     chatId: 'cli',
+    ...(m.toolTokens !== undefined ? { toolTokens: m.toolTokens } : {}),
   }));
 
   const analysis = calculateDrift(chatMessages, config.weights);

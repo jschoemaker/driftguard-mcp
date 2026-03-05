@@ -22,7 +22,7 @@ describe('GeminiAdapter.canParse', () => {
 describe('GeminiAdapter.parse', () => {
   it('parses all messages from the sample fixture', () => {
     const messages = adapter.parse(path.join(FIXTURES, 'gemini-sample.jsonl'));
-    expect(messages.length).toBe(3);
+    expect(messages.length).toBe(5);
   });
 
   it('maps role:model to role:assistant', () => {
@@ -50,5 +50,24 @@ describe('GeminiAdapter.parse', () => {
     const messages = adapter.parse(path.join(FIXTURES, 'gemini-sample.jsonl'));
     const ids = messages.map(m => m.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('extracts toolTokens from functionCall parts', () => {
+    const messages = adapter.parse(path.join(FIXTURES, 'gemini-sample.jsonl'));
+    const withTool = messages.find(m => m.toolTokens !== undefined && m.toolTokens > 0);
+    expect(withTool).toBeDefined();
+    expect(withTool!.toolTokens).toBeGreaterThan(0);
+  });
+
+  it('extracts toolTokens from functionResponse parts', () => {
+    const messages = adapter.parse(path.join(FIXTURES, 'gemini-sample.jsonl'));
+    const withResponse = messages.filter(m => m.toolTokens !== undefined && m.toolTokens > 0);
+    expect(withResponse.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('does not set toolTokens on messages without tool parts', () => {
+    const messages = adapter.parse(path.join(FIXTURES, 'gemini-sample.jsonl'));
+    const plain = messages.find(m => m.content === 'How do I sort a list in Python?');
+    expect(plain?.toolTokens).toBeUndefined();
   });
 });

@@ -1,3 +1,5 @@
 {"role":"user","parts":[{"text":"How do I sort a list in Python?"}],"timestamp":"2024-01-01T10:00:00Z"}
 {"role":"model","parts":[{"text":"You can use the built-in sort() method or the sorted() function.\n\nExample:\n```python\nmy_list = [3, 1, 2]\nmy_list.sort()  # in-place\nsorted_list = sorted(my_list)  # returns new list\n```"}],"timestamp":"2024-01-01T10:00:05Z"}
 {"role":"user","parts":[{"text":"What about sorting in reverse order?"}],"timestamp":"2024-01-01T10:01:00Z"}
+{"role":"model","parts":[{"text":"Let me check the file."},{"functionCall":{"name":"read_file","args":{"path":"sort_example.py"}}}],"timestamp":"2024-01-01T10:01:10Z"}
+{"role":"user","parts":[{"text":"Got it."},{"functionResponse":{"name":"read_file","response":{"output":"my_list.sort(reverse=True)"}}}],"timestamp":"2024-01-01T10:01:15Z"}

@@ -7,11 +7,19 @@ export interface ParsedMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  /** Estimated tokens from tool_use / tool_result blocks in this message.
+   *  Used only for contextSaturation — not included in semantic content. */
+  toolTokens?: number;
 }
 
 interface ContentBlock {
   type: string;
   text?: string;
+  // tool_use fields
+  name?: string;
+  input?: Record<string, unknown>;
+  // tool_result fields
+  content?: string | ContentBlock[];
 }
 
 function parseTimestamp(raw: unknown): number {
@@ -38,14 +46,34 @@ export function parseJSONL(filePath: string): ParsedMessage[] {
       const content = entry.message?.content;
       let text = '';
 
+      let toolTokens = 0;
+
       if (typeof content === 'string') {
         text = content.trim();
       } else if (Array.isArray(content)) {
-        text = (content as ContentBlock[])
+        const blocks = content as ContentBlock[];
+        text = blocks
           .filter(block => block.type === 'text' && typeof block.text === 'string')
           .map(block => (block.text as string).trim())
           .join('\n')
           .trim();
+
+        for (const block of blocks) {
+          if (block.type === 'tool_use' && block.input) {
+            const inputText = JSON.stringify(block.input);
+            toolTokens += Math.round(inputText.length / 4);
+          } else if (block.type === 'tool_result') {
+            const resultText = typeof block.content === 'string'
+              ? block.content
+              : Array.isArray(block.content)
+                ? (block.content as ContentBlock[])
+                    .filter(b => b.type === 'text' && typeof b.text === 'string')
+                    .map(b => b.text as string)
+                    .join('\n')
+                : '';
+            toolTokens += Math.round(resultText.length / 4);
+          }
+        }
       }
 
       if (!text.trim()) continue;
@@ -55,6 +83,7 @@ export function parseJSONL(filePath: string): ParsedMessage[] {
         role: entry.message.role,
         content: text,
         timestamp: parseTimestamp(entry.timestamp),
+        ...(toolTokens > 0 ? { toolTokens } : {}),
       });
     } catch {
       skipped++;
