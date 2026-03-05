@@ -1,0 +1,53 @@
+{
+  "name": "driftguard-mcp",
+  "version": "0.1.2",
+  "description": "Real-time AI conversation drift monitor — MCP server for Claude Code, Gemini CLI, Codex CLI, and Cursor",
+  "main": "dist/bin.js",
+  "bin": {
+    "driftguard-mcp": "dist/bin.js"
+  },
+  "files": [
+    "dist/",
+    "README.md"
+  ],
+  "scripts": {
+    "start": "tsx src/cli.ts",
+    "build": "node build.mjs",
+    "build:watch": "node build.mjs --watch",
+    "build:tsc": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": [
+    "claude",
+    "mcp",
+    "drift",
+    "ai",
+    "context",
+    "claude-code",
+    "cursor",
+    "gemini",
+    "codex"
+  ],
+  "author": "jschoemaker",
+  "license": "ISC",
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jschoemaker/driftguard-mcp"
+  },
+  "homepage": "https://github.com/jschoemaker/driftguard-mcp#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "chokidar": "^5.0.0",
+    "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "esbuild": "^0.27.3",
+    "tsx": "^4.21.0",
+    "vitest": "^4.0.18"
+  }
+}

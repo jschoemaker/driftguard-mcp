@@ -1,0 +1,5 @@
+{"type":"user","uuid":"u1","timestamp":"2024-01-01T10:00:00.000Z","message":{"role":"user","content":"Hello there"}}
+THIS IS NOT VALID JSON AT ALL
+{"type":"assistant","uuid":"a1","timestamp":"2024-01-01T10:00:02.000Z","message":{"role":"assistant","content":[{"type":"text","text":"Hi! How can I help you today?"}]}}
+{"type":"summary","uuid":"s1","message":{"content":"some system summary — valid JSON but not a message"}}
+{"type":"user","uuid":"u2","timestamp":"2024-01-01T10:01:00.000Z","message":{"role":"user","content":"Thanks for your help"}}

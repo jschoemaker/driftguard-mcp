@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm test:*)",
+      "WebSearch",
+      "WebFetch(domain:esbuild.github.io)",
+      "Bash(npm run:*)",
+      "mcp__driftcli__get_drift",
+      "mcp__driftcli__get_trend",
+      "Bash(ls:*)",
+      "Bash(node:*)",
+      "Bash(sed:*)",
+      "Bash(python3:*)",
+      "Bash(npm:*)",
+      "Bash(curl:*)",
+      "Bash(powershell:*)"
+    ]
+  }
+}

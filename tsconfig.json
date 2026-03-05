@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "paths": {
+      "driftcli": ["./src/index.ts"],
+      "driftcli/core": ["./src/core/index.ts"],
+      "driftcli/watchers": ["./src/watchers/index.ts"]
+    }
+  },
+  "include": ["src", "tests"]
+}
