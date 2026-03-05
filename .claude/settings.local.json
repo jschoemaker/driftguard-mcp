@@ -14,7 +14,9 @@
       "Bash(python3:*)",
       "Bash(npm:*)",
       "Bash(curl:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npx:*)"
     ]
   }
 }

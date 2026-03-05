@@ -91,12 +91,10 @@ export function calculateAnchorDrift(messages: ChatMessage[], userGoal?: string)
   // Ensure similarity is a valid number
   if (typeof similarity !== 'number' || isNaN(similarity)) return 0;
 
-  // Convert: high similarity = low drift, low similarity = high drift
-  // Scale non-linearly: conversations naturally evolve, so mild divergence is normal
-  const rawDrift = 1 - similarity;
-  const score = Math.round(Math.min(100, rawDrift * 140));
-
-  // Final safety check for NaN
+  // Convert: high similarity = low drift, low similarity = high drift.
+  // Conversations naturally diverge in vocabulary even on-topic, so we treat
+  // similarity >= 0.5 as healthy (score 0). Score rises to 100 at similarity 0.
+  const score = goalDriftScore(similarity);
   return Math.max(0, isNaN(score) ? 0 : score);
 }
 
@@ -182,9 +180,7 @@ export function calculateGoalDriftCheckpoints(
     const similarity = cosineSimilarity(vectors[0], vectors[1]);
     const validSimilarity =
       typeof similarity === 'number' && !isNaN(similarity) ? similarity : 0;
-    const driftScore = Math.round(
-      Math.min(100, (1 - validSimilarity) * 140),
-    );
+    const driftScore = goalDriftScore(validSimilarity);
 
     checkpoints.push({
       position: pos,
@@ -286,6 +282,28 @@ export function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
 
   const union = a.size + b.size - intersection;
   return union === 0 ? 1 : intersection / union;
+}
+
+// ============================================================
+// Goal Drift Scoring Curve
+// ============================================================
+
+/**
+ * Convert cosine similarity to a 0-100 drift score.
+ *
+ * Similarity ≥ 0.5 → score 0  (healthy: vocabulary overlap is typical even on-topic)
+ * Similarity = 0.25 → score 50 (moderate drift)
+ * Similarity = 0   → score 100 (completely unrelated content)
+ *
+ * Linear from [0, 0.5] → [100, 0], clamped below.
+ * This replaces the old rawDrift * 140 formula which saturated at similarity < 0.29,
+ * causing on-topic conversations to score 100.
+ */
+function goalDriftScore(similarity: number): number {
+  const HEALTHY_THRESHOLD = 0.5;
+  const rawDrift = 1 - similarity;
+  const normalized = Math.max(0, (rawDrift - (1 - HEALTHY_THRESHOLD)) / HEALTHY_THRESHOLD);
+  return Math.round(Math.min(100, normalized * 100));
 }
 
 // ============================================================
