@@ -4,12 +4,11 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { SessionResolver } from './watchers/session-resolver';
 import { calculateDrift } from './core/drift-calculator';
-import { scoreToLevel, DriftAnalysis } from './core/types';
-import { extractTopTerms } from './core/topic-analyzer';
+import { scoreToLevel } from './core/types';
 import { loadConfig } from './config';
 import { Storage } from './storage';
 import { renderTrend, sparkline } from './ui';
-import { ParsedMessage } from './watchers/adapter';
+
 
 const config   = loadConfig();
 const resolver = new SessionResolver(config.sessionResolution.cacheTtlMs);
@@ -49,73 +48,27 @@ const LEVEL_EMOJI: Record<string, string> = {
   polluted: '⚫',
 };
 
-function buildHandoff(
-  analysis: DriftAnalysis,
-  messages: ParsedMessage[],
-  chatMessages: (ParsedMessage & { platform: 'claude'; tabId: number; chatId: string })[],
-  emoji: string,
-  level: string,
-): string {
-  const durationMs = analysis.sessionDuration;
-  const durationMin = durationMs > 0 ? Math.round(durationMs / 60_000) : null;
-  const durationStr = durationMin !== null
-    ? durationMin >= 60
-      ? `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`
-      : `${durationMin}m`
-    : 'unknown duration';
-
-  const topTerms = extractTopTerms(chatMessages, 6);
-  const topicsStr = topTerms.length > 0
-    ? topTerms.join(', ')
-    : 'not enough content to determine';
-
-  const recentUserMessages = messages
-    .filter(m => m.role === 'user')
-    .slice(-3)
-    .map((m, i) => `${i + 1}. ${m.content.slice(0, 200)}${m.content.length > 200 ? '…' : ''}`)
-    .join('\n');
-
-  let lastCodeSnippet = '';
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const match = [...messages[i].content.matchAll(/```(\w*)\n([\s\S]*?)```/g)].pop();
-    if (match) {
-      const lang = match[1] || '';
-      const code = match[2].split('\n').slice(0, 20).join('\n');
-      lastCodeSnippet = `\`\`\`${lang}\n${code}\n\`\`\``;
-      break;
-    }
-  }
-
-  const lines: string[] = [
-    `## Context Handoff`,
+function buildHandoff(): string {
+  return [
+    `Please write a \`handoff.md\` file in the current working directory with the following structure:`,
     ``,
-    `**Drift:** ${analysis.score}/100 ${emoji} ${level.toUpperCase()} | **Messages:** ${messages.length} | **Duration:** ${durationStr}`,
+    `## What we accomplished`,
+    `A clear summary of everything completed this session.`,
     ``,
-    `**Top topics:** ${topicsStr}`,
+    `## Current state`,
+    `Where things stand right now — what's working, what's broken, what's in progress.`,
     ``,
-    `**Recent focus (last 3 user messages):**`,
-    recentUserMessages,
-  ];
-
-  if (lastCodeSnippet) {
-    lines.push(``, `**Last code context:**`, lastCodeSnippet);
-  }
-
-  lines.push(
+    `## Files modified`,
+    `List of files changed this session and what changed in each.`,
     ``,
-    `---`,
-    `*Paste the section below into your new session to restore context.*`,
+    `## Open questions / next steps`,
+    `Anything unresolved, pending decisions, or what should be done next.`,
     ``,
-    `**Continuing from a previous session** (drift was ${analysis.score}/100, ${messages.length} messages, ${durationStr}).`,
-    `Main topics: ${topicsStr}.`,
+    `## Context for next session`,
+    `Key decisions, constraints, or background a fresh session needs to continue without losing context.`,
     ``,
-    `Recent questions:`,
-    recentUserMessages,
-    ``,
-    `Please continue from here.`,
-  );
-
-  return lines.join('\n');
+    `Write the file now.`,
+  ].join('\n');
 }
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -191,18 +144,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (trendLine) lines.push(``, trendLine);
 
     if (isDegrading) {
-      lines.push(
-        ``,
-        `---`,
-        buildHandoff(analysis, messages, chatMessages, emoji, level),
-      );
+      lines.push(``, `---`, buildHandoff());
     }
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
   }
 
   if (request.params.name === 'get_handoff') {
-    return { content: [{ type: 'text', text: buildHandoff(analysis, messages, chatMessages, emoji, level) }] };
+    return { content: [{ type: 'text', text: buildHandoff() }] };
   }
 
   if (request.params.name === 'get_trend') {

@@ -16,7 +16,13 @@
       "Bash(curl:*)",
       "Bash(powershell:*)",
       "Bash(npx tsx:*)",
-      "Bash(npx:*)"
+      "Bash(npx:*)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(driftguard-mcp:*)",
+      "mcp__driftcli__get_handoff",
+      "WebFetch(domain:dev.to)"
     ]
   }
 }
