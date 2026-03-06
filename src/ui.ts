@@ -61,13 +61,12 @@ export function sparkline(scores: number[]): string {
 // ============================================================
 
 const FACTOR_LABELS: Partial<Record<keyof DriftFactors, string>> = {
-  contextSaturation:  'Context Saturation',
-  topicScatter:       'Topic Scatter',
-  uncertaintySignals: 'Uncertainty',
-  codeInconsistency:  'Code Inconsistency',
-  repetition:         'Repetition',
-  goalDistance:       'Goal Distance',
-  confidenceDrift:    'Confidence Drift',
+  contextSaturation:     'Context Saturation',
+  uncertaintySignals:    'Uncertainty',
+  repetition:            'Repetition',
+  goalDistance:          'Goal Distance',
+  confidenceDrift:       'Confidence Drift',
+  responseLengthCollapse: 'Length Collapse',
 };
 
 // ============================================================

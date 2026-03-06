@@ -29,7 +29,6 @@ export interface ChatMessage {
 
 export interface DriftFactors {
   contextSaturation: number;      // 0-100: token depth (real API counts where available)
-  topicScatter: number;           // 0-100: topic fragmentation (TF-IDF cosine similarity)
   uncertaintySignals: number;     // 0-100: explicit self-corrections
   repetition: number;             // 0-100: repeated content (3-gram sliding window)
   goalDistance: number;           // 0-100: semantic distance from original goal
@@ -38,20 +37,18 @@ export interface DriftFactors {
 }
 
 export interface DriftWeights {
-  contextSaturation: number;      // default 0.35 — most reliable: real token depth
-  topicScatter: number;           // default 0.04 — noisy: lexical not semantic
+  contextSaturation: number;      // default 0.37 — most reliable: real token depth
   uncertaintySignals: number;     // default 0.02 — high precision, low recall
-  repetition: number;             // default 0.35 — most reliable: model recycling output
+  repetition: number;             // default 0.37 — most reliable: model recycling output
   goalDistance: number;           // default 0.08 — lexical proxy, noisy
   confidenceDrift: number;        // default 0.01 — trend signal, supporting only
   responseLengthCollapse: number; // default 0.15 — reliable symptom of degradation
 }
 
 export const DEFAULT_WEIGHTS: DriftWeights = {
-  contextSaturation: 0.35,
-  topicScatter: 0.04,
+  contextSaturation: 0.37,
   uncertaintySignals: 0.02,
-  repetition: 0.35,
+  repetition: 0.37,
   goalDistance: 0.08,
   confidenceDrift: 0.01,
   responseLengthCollapse: 0.15,

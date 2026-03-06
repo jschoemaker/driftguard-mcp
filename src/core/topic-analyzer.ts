@@ -1,81 +1,8 @@
 // ============================================================
-// Topic Analyzer — TF-IDF Cosine Similarity
-// ============================================================
-// Measures topic entropy using TF-IDF vectors and cosine
-// similarity between sliding windows. More accurate than
-// simple keyword Jaccard — weights terms by importance.
+// Topic Analyzer — Goal Drift + TF-IDF Utilities
 // ============================================================
 
 import { ChatMessage, GoalDriftAnalysis, GoalCheckpoint } from './types';
-
-// ============================================================
-// Public API
-// ============================================================
-
-/**
- * Calculate topic entropy score (0-100) using TF-IDF cosine similarity.
- * Higher = more scattered topics = higher drift risk.
- */
-/** Maximum number of messages fed into topic entropy to prevent OOM on huge sessions. */
-const TOPIC_ENTROPY_MSG_CAP = 150;
-
-export function calculateTopicEntropy(messages: ChatMessage[]): number {
-  if (messages.length < 3) return 0;
-
-  // Cap to the most recent N messages to bound memory usage on very long sessions
-  const capped = messages.length > TOPIC_ENTROPY_MSG_CAP
-    ? messages.slice(-TOPIC_ENTROPY_MSG_CAP)
-    : messages;
-
-  const windows = createWindows(capped, 3);
-  if (windows.length < 2) return 0;
-
-  // Build TF-IDF from the corpus of windows
-  const corpus = windows.map(w => w.join(' '));
-  const tfidfVectors = buildTfidfVectors(corpus);
-
-  // Consecutive window similarity — recency-weighted so recent topic shifts count more
-  const consecutiveSims: number[] = [];
-  for (let i = 1; i < tfidfVectors.length; i++) {
-    consecutiveSims.push(cosineSimilarity(tfidfVectors[i - 1], tfidfVectors[i]));
-  }
-  let avgConsecutive: number;
-  if (consecutiveSims.length === 0) {
-    avgConsecutive = 1;
-  } else {
-    let wSum = 0, wTotal = 0;
-    for (let i = 0; i < consecutiveSims.length; i++) {
-      const w = i + 1;
-      wSum += consecutiveSims[i] * w;
-      wTotal += w;
-    }
-    avgConsecutive = wSum / wTotal;
-  }
-
-  // Wide jumps — compare every 3rd window for macro-level drift, also recency-weighted
-  const wideSims: number[] = [];
-  for (let i = 3; i < tfidfVectors.length; i += 3) {
-    wideSims.push(cosineSimilarity(tfidfVectors[i - 3], tfidfVectors[i]));
-  }
-  let avgWide: number;
-  if (wideSims.length === 0) {
-    avgWide = avgConsecutive;
-  } else {
-    let wSum = 0, wTotal = 0;
-    for (let i = 0; i < wideSims.length; i++) {
-      const w = i + 1;
-      wSum += wideSims[i] * w;
-      wTotal += w;
-    }
-    avgWide = wSum / wTotal;
-  }
-
-  // Blend: 60% consecutive, 40% wide comparison
-  const blendedSimilarity = avgConsecutive * 0.6 + avgWide * 0.4;
-
-  const entropy = Math.round((1 - blendedSimilarity) * 100);
-  return Math.min(100, Math.max(0, entropy));
-}
 
 /**
  * Calculate anchor drift score (0-100).
@@ -83,16 +10,13 @@ export function calculateTopicEntropy(messages: ChatMessage[]): number {
  * original user message (the "anchor" / goal).
  */
 export function calculateAnchorDrift(messages: ChatMessage[], userGoal?: string): number {
+  if (!userGoal) return 0;
   if (messages.length < 4) return 0;
 
   const userMessages = messages.filter(m => m.role === 'user');
   if (userMessages.length < 2) return 0;
 
-  // Anchor = explicit user goal if set, otherwise first 3 substantive user messages (>20 chars).
-  // Filtering short messages avoids anchoring on "yes", "ok", "go ahead" openers.
-  const anchorDoc = userGoal
-    ? userGoal
-    : userMessages.filter(m => m.content.trim().length > 20).slice(0, 3).map(m => m.content).join(' ');
+  const anchorDoc = userGoal;
 
   // Recent = last 3 messages (current state of conversation)
   const recentMessages = messages.slice(-3);
@@ -128,32 +52,15 @@ export function calculateGoalDriftCheckpoints(
   messages: ChatMessage[],
   userGoal?: string,
 ): GoalDriftAnalysis {
-  if (messages.length < 4) {
-    return {
-      checkpoints: [],
-      trajectory: 'stable',
-      averageScore: 0,
-      startToEndDrift: 0,
-    };
-  }
+  const empty: GoalDriftAnalysis = { checkpoints: [], trajectory: 'stable', averageScore: 0, startToEndDrift: 0 };
+
+  if (!userGoal) return empty;
+  if (messages.length < 4) return empty;
 
   const userMessages = messages.filter(m => m.role === 'user');
-  if (userMessages.length < 2) {
-    return {
-      checkpoints: [],
-      trajectory: 'stable',
-      averageScore: 0,
-      startToEndDrift: 0,
-    };
-  }
+  if (userMessages.length < 2) return empty;
 
-  // Anchor = user's explicit goal, or first 1-2 user messages
-  const anchorTexts = userGoal
-    ? [userGoal]
-    : userMessages.slice(0, Math.min(2, userMessages.length));
-  const anchorDoc = Array.isArray(anchorTexts)
-    ? anchorTexts.map(m => typeof m === 'string' ? m : m.content).join(' ')
-    : anchorTexts;
+  const anchorDoc = userGoal;
 
   if (!anchorDoc.trim()) {
     return {
@@ -432,31 +339,6 @@ function tokenize(text: string): string[] {
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter(w => w.length >= 4 && !STOP_WORDS.has(w));
-}
-
-/**
- * Create sliding windows of concatenated message texts.
- */
-function createWindows(messages: ChatMessage[], windowSize: number): string[][] {
-  const windows: string[][] = [];
-
-  for (let i = 0; i <= messages.length - windowSize; i++) {
-    const windowTexts = messages
-      .slice(i, i + windowSize)
-      .map(m => {
-        const withoutCode = m.content.replace(/```[\s\S]*?```/g, ' ');
-        return withoutCode
-          .toLowerCase()
-          .replace(/[^a-z0-9\s]/g, ' ')
-          .split(/\s+/)
-          .filter(w => w.length >= 4 && !STOP_WORDS.has(w));
-      })
-      .flat();
-
-    windows.push(windowTexts);
-  }
-
-  return windows;
 }
 
 // ============================================================

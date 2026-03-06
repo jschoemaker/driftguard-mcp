@@ -18,7 +18,6 @@ import {
   scoreToLevel,
 } from './types';
 import {
-  calculateTopicEntropy,
   calculateAnchorDrift,
   extractNgrams,
   fleschKincaidGrade,
@@ -54,7 +53,6 @@ export function calculateDrift(
 
   const factors: DriftFactors = {
     contextSaturation: calcMessageDecay(messages),
-    topicScatter: calculateTopicEntropy(messages),
     uncertaintySignals: calcContradictionScore(messages),
     repetition: calcRepetition(messages),
     goalDistance: calculateAnchorDrift(messages, userGoal),
@@ -64,7 +62,6 @@ export function calculateDrift(
 
   const score = Math.min(100, Math.max(0, Math.round(
     factors.contextSaturation * weights.contextSaturation +
-    factors.topicScatter * weights.topicScatter +
     factors.uncertaintySignals * weights.uncertaintySignals +
     factors.repetition * weights.repetition +
     factors.goalDistance * weights.goalDistance +
@@ -377,9 +374,6 @@ function generateRecommendations(score: number, factors: DriftFactors): string[]
   if (factors.contextSaturation > 50) {
     recs.push('Long conversation — consider starting fresh with a summary of key decisions.');
   }
-  if (factors.topicScatter > 50) {
-    recs.push('Multiple topics detected — try to keep one topic per conversation.');
-  }
   if (factors.uncertaintySignals > 40) {
     recs.push('AI is self-correcting frequently — context may be confused. Re-state your requirements.');
   }
@@ -409,7 +403,6 @@ function emptyAnalysis(weights: DriftWeights): DriftAnalysis {
     level: 'fresh',
     factors: {
       contextSaturation: 0,
-      topicScatter: 0,
       uncertaintySignals: 0,
       repetition: 0,
       goalDistance: 0,

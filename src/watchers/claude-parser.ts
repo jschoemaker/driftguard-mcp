@@ -60,7 +60,8 @@ export function parseJSONL(filePath: string): ParsedMessage[] {
 
       // Compact boundary: Claude's context was reset by compaction.
       // Drop all messages collected so far — they are no longer in Claude's context.
-      if (entry.type === 'compact_boundary') {
+      // Real format: { type: "system", subtype: "compact_boundary", ... }
+      if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
         messages.length = 0;
         continue;
       }

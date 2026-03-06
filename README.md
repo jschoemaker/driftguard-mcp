@@ -153,11 +153,10 @@ The score is driven primarily by two signals that reliably predict context degra
 
 | Factor | Weight | What it measures |
 |--------|--------|-----------------|
-| **Context depth** | 35% | Token volume in the session (real API counts for Claude and Gemini) |
-| **Repetition** | 35% | 3-gram overlap across recent assistant responses — the model recycling its own output |
+| **Context depth** | 37% | Token volume in the session (real API counts for Claude and Gemini) |
+| **Repetition** | 37% | 3-gram overlap across recent assistant responses — the model recycling its own output |
 | Response length collapse | 15% | Assistant responses getting shorter over time |
-| Goal distance | 8% | Vocabulary drift from the opening messages |
-| Topic scatter | 4% | Topic fragmentation across the conversation |
+| Goal distance | 8% | Vocabulary drift from your stated goal (pass `goal` param to activate) |
 | Uncertainty signals | 2% | Explicit self-corrections ("I was wrong", "let me correct that") |
 | Confidence drift | 1% | Hedging language trend (early vs late responses) |
 
@@ -173,7 +172,7 @@ Pass an optional `goal` string to anchor the goal distance measurement to a spec
 get_drift({ goal: "build a JWT authentication system" })
 ```
 
-Without it, goal distance is inferred from your first few messages.
+Without it, goal distance returns 0 (no anchor = no measurement).
 
 ---
 
@@ -200,7 +199,7 @@ Both are plain JSON. All fields are optional.
 | `coding` | Focused coding sessions |
 | `research` | Research or planning — weights topic stability and goal alignment |
 | `brainstorm` | Brainstorming — relaxed topic scatter penalty |
-| `strict` | Equal weight across all seven factors |
+| `strict` | Equal weight across all six factors |
 
 ### All options
 

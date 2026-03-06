@@ -5,7 +5,6 @@ import { makeMsg, conversation, repeatPair } from '../helpers';
 
 const ALL_ZERO_WEIGHTS: DriftWeights = {
   contextSaturation: 0,
-  topicScatter: 0,
   uncertaintySignals: 0,
   repetition: 0,
   goalDistance: 0,

@@ -99,7 +99,6 @@ function buildDriftOutput(
   row('Repetition', factors.repetition);
   if (factors.responseLengthCollapse > 5)  row('Length collapse', factors.responseLengthCollapse);
   if (factors.goalDistance > 20)           row('Goal distance', factors.goalDistance);
-  if (factors.topicScatter > 20)           row('Topic scatter', factors.topicScatter);
   if (factors.uncertaintySignals > 10)     row('Uncertainty', factors.uncertaintySignals);
   if (factors.confidenceDrift > 10)        row('Confidence drift', factors.confidenceDrift);
 

@@ -8,15 +8,15 @@ import { loadConfig, DEFAULT_CONFIG, WEIGHT_PRESETS } from '../../src/config';
 // Tests use this to point at a temp directory instead of the real home.
 
 describe('DEFAULT_CONFIG', () => {
-  it('has all seven drift factor weights', () => {
+  it('has all six drift factor weights', () => {
     const keys = Object.keys(DEFAULT_CONFIG.weights);
     expect(keys).toContain('contextSaturation');
-    expect(keys).toContain('topicScatter');
     expect(keys).toContain('uncertaintySignals');
     expect(keys).toContain('repetition');
     expect(keys).toContain('goalDistance');
     expect(keys).toContain('confidenceDrift');
     expect(keys).toContain('responseLengthCollapse');
+    expect(keys).not.toContain('topicScatter');
     expect(keys).not.toContain('codeInconsistency');
   });
 
@@ -159,9 +159,9 @@ describe('WEIGHT_PRESETS', () => {
     }
   });
 
-  it('each preset has all seven factors', () => {
+  it('each preset has all six factors', () => {
     const expectedKeys = [
-      'contextSaturation', 'topicScatter', 'uncertaintySignals',
+      'contextSaturation', 'uncertaintySignals',
       'repetition', 'goalDistance', 'confidenceDrift', 'responseLengthCollapse',
     ];
     for (const [name, weights] of Object.entries(WEIGHT_PRESETS)) {

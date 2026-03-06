@@ -14,7 +14,6 @@ import { makeMsg, conversation, repeatPair } from '../helpers';
 
 const ZERO: DriftWeights = {
   contextSaturation: 0,
-  topicScatter: 0,
   uncertaintySignals: 0,
   repetition: 0,
   goalDistance: 0,
@@ -59,35 +58,7 @@ describe('factor: contextSaturation', () => {
     expect(withScore).toBeGreaterThan(withoutScore);
   });
 
-// ── 2. topicScatter ───────────────────────────────────────────────────────────
-
-describe('factor: topicScatter', () => {
-  it('is lower for a focused single-topic conversation', () => {
-    const focused = conversation([
-      ['what is a binary tree?', 'A binary tree is a data structure where each node has at most two children.'],
-      ['how do you traverse a binary tree?', 'You can traverse in-order, pre-order, or post-order using recursion.'],
-      ['what is the height of a binary tree?', 'The height is the longest path from root to a leaf node.'],
-      ['how do you balance a binary tree?', 'AVL and red-black trees use rotations to maintain balance.'],
-      ['what is a binary search tree?', 'A BST keeps left children smaller and right children larger than the parent.'],
-      ['how do you insert into a BST?', 'Compare with the current node and recurse left or right until a null slot is found.'],
-    ]);
-
-    const scattered = conversation([
-      ['what is photosynthesis?', 'Photosynthesis converts sunlight and CO2 into glucose and oxygen.'],
-      ['explain quantum entanglement', 'Entangled particles share state regardless of distance between them.'],
-      ['how does TCP/IP work?', 'TCP/IP is a protocol suite for transmitting data over packet-switched networks.'],
-      ['what causes inflation?', 'Inflation occurs when money supply grows faster than economic output.'],
-      ['describe the water cycle', 'Water evaporates, condenses into clouds, and falls as precipitation.'],
-      ['how do vaccines work?', 'Vaccines train the immune system by exposing it to antigens or mRNA instructions.'],
-    ]);
-
-    const focusedScore = calculateDrift(focused, ZERO).factors.topicScatter;
-    const scatteredScore = calculateDrift(scattered, ZERO).factors.topicScatter;
-    expect(scatteredScore).toBeGreaterThan(focusedScore);
-  });
-});
-
-// ── 3. uncertaintySignals ─────────────────────────────────────────────────────
+// ── 2. uncertaintySignals ─────────────────────────────────────────────────────
 
 describe('factor: uncertaintySignals', () => {
   it('is 0 for confident assistant responses', () => {
@@ -163,7 +134,7 @@ describe('factor: goalDistance', () => {
       ['how do I cook pasta?', 'Boil salted water, add pasta, cook 8-10 minutes, drain and add sauce.'],
       ['what is the meaning of life?', 'Philosophers debate this endlessly — common answers include purpose, love, or 42.'],
     ]);
-    const { factors } = calculateDrift(drifted, ZERO);
+    const { factors } = calculateDrift(drifted, ZERO, 'Build a REST API in Node.js using Express');
     expect(factors.goalDistance).toBeGreaterThan(0);
   });
 });

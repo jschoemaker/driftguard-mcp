@@ -89,7 +89,7 @@ describe('parseJSONL', () => {
     const lines = [
       JSON.stringify({ type: 'user', uuid: 'u1', timestamp: 1000, message: { role: 'user', content: 'pre-compaction message' } }),
       JSON.stringify({ type: 'assistant', uuid: 'a1', timestamp: 2000, message: { role: 'assistant', content: [{ type: 'text', text: 'pre-compaction reply' }] } }),
-      JSON.stringify({ type: 'compact_boundary', uuid: 'cb1', timestamp: 3000 }),
+      JSON.stringify({ type: 'system', subtype: 'compact_boundary', uuid: 'cb1', timestamp: 3000, content: 'Conversation compacted' }),
       JSON.stringify({ type: 'user', uuid: 'u2', timestamp: 4000, message: { role: 'user', content: 'post-compaction message' } }),
       JSON.stringify({ type: 'assistant', uuid: 'a2', timestamp: 5000, message: { role: 'assistant', content: [{ type: 'text', text: 'post-compaction reply' }] } }),
     ];

@@ -16,44 +16,40 @@ import { DriftWeights, DEFAULT_WEIGHTS } from './core/types';
  * Explicit "weights" entries always override the preset.
  */
 export const WEIGHT_PRESETS: Record<string, DriftWeights> = {
-  /** Equal importance across all seven factors. */
+  /** Equal importance across all six factors. */
   strict: {
-    contextSaturation:      1 / 7,
-    topicScatter:           1 / 7,
-    uncertaintySignals:     1 / 7,
-    repetition:             1 / 7,
-    goalDistance:           1 / 7,
-    confidenceDrift:        1 / 7,
-    responseLengthCollapse: 1 / 7,
+    contextSaturation:      1 / 6,
+    uncertaintySignals:     1 / 6,
+    repetition:             1 / 6,
+    goalDistance:           1 / 6,
+    confidenceDrift:        1 / 6,
+    responseLengthCollapse: 1 / 6,
   },
   /** Emphasises repetition, length collapse, and context depth — good for focused coding sessions. */
   coding: {
-    contextSaturation:      0.20,
-    topicScatter:           0.08,
+    contextSaturation:      0.24,
     uncertaintySignals:     0.10,
-    repetition:             0.25,
+    repetition:             0.29,
     goalDistance:           0.18,
     confidenceDrift:        0.07,
     responseLengthCollapse: 0.12,
   },
-  /** Emphasises topic stability and goal alignment — good for research or planning. */
+  /** Emphasises goal alignment — good for research or planning. */
   research: {
     contextSaturation:      0.15,
-    topicScatter:           0.20,
     uncertaintySignals:     0.15,
     repetition:             0.13,
-    goalDistance:           0.25,
+    goalDistance:           0.45,
     confidenceDrift:        0.07,
     responseLengthCollapse: 0.05,
   },
-  /** Forgiving preset for brainstorming — topic scatter is not penalised heavily. */
+  /** Forgiving preset for brainstorming. */
   brainstorm: {
     contextSaturation:      0.22,
-    topicScatter:           0.05,
     uncertaintySignals:     0.13,
     repetition:             0.25,
     goalDistance:           0.12,
-    confidenceDrift:        0.13,
+    confidenceDrift:        0.18,
     responseLengthCollapse: 0.10,
   },
 };
