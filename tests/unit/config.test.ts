@@ -13,10 +13,11 @@ describe('DEFAULT_CONFIG', () => {
     expect(keys).toContain('contextSaturation');
     expect(keys).toContain('topicScatter');
     expect(keys).toContain('uncertaintySignals');
-    expect(keys).toContain('codeInconsistency');
     expect(keys).toContain('repetition');
     expect(keys).toContain('goalDistance');
     expect(keys).toContain('confidenceDrift');
+    expect(keys).toContain('responseLengthCollapse');
+    expect(keys).not.toContain('codeInconsistency');
   });
 
   it('weights sum to approximately 1.0', () => {
@@ -161,7 +162,7 @@ describe('WEIGHT_PRESETS', () => {
   it('each preset has all seven factors', () => {
     const expectedKeys = [
       'contextSaturation', 'topicScatter', 'uncertaintySignals',
-      'codeInconsistency', 'repetition', 'goalDistance', 'confidenceDrift',
+      'repetition', 'goalDistance', 'confidenceDrift', 'responseLengthCollapse',
     ];
     for (const [name, weights] of Object.entries(WEIGHT_PRESETS)) {
       for (const key of expectedKeys) {
@@ -209,7 +210,7 @@ describe('loadConfig preset resolution', () => {
     const config = loadConfig();
     expect(config.weights.repetition).toBe(0.99);
     // Other fields should come from the preset
-    expect(config.weights.codeInconsistency).toBe(WEIGHT_PRESETS.coding.codeInconsistency);
+    expect(config.weights.goalDistance).toBe(WEIGHT_PRESETS.coding.goalDistance);
   });
 
   it('warns and falls back to defaults for an unknown preset name', () => {

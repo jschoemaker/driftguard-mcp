@@ -34,21 +34,41 @@ export function calculateTopicEntropy(messages: ChatMessage[]): number {
   const corpus = windows.map(w => w.join(' '));
   const tfidfVectors = buildTfidfVectors(corpus);
 
-  // Consecutive window similarity
+  // Consecutive window similarity — recency-weighted so recent topic shifts count more
   const consecutiveSims: number[] = [];
   for (let i = 1; i < tfidfVectors.length; i++) {
     consecutiveSims.push(cosineSimilarity(tfidfVectors[i - 1], tfidfVectors[i]));
   }
-  const avgConsecutive = consecutiveSims.reduce((a, b) => a + b, 0) / consecutiveSims.length;
+  let avgConsecutive: number;
+  if (consecutiveSims.length === 0) {
+    avgConsecutive = 1;
+  } else {
+    let wSum = 0, wTotal = 0;
+    for (let i = 0; i < consecutiveSims.length; i++) {
+      const w = i + 1;
+      wSum += consecutiveSims[i] * w;
+      wTotal += w;
+    }
+    avgConsecutive = wSum / wTotal;
+  }
 
-  // Wide jumps — compare every 3rd window for macro-level drift
+  // Wide jumps — compare every 3rd window for macro-level drift, also recency-weighted
   const wideSims: number[] = [];
   for (let i = 3; i < tfidfVectors.length; i += 3) {
     wideSims.push(cosineSimilarity(tfidfVectors[i - 3], tfidfVectors[i]));
   }
-  const avgWide = wideSims.length > 0
-    ? wideSims.reduce((a, b) => a + b, 0) / wideSims.length
-    : avgConsecutive;
+  let avgWide: number;
+  if (wideSims.length === 0) {
+    avgWide = avgConsecutive;
+  } else {
+    let wSum = 0, wTotal = 0;
+    for (let i = 0; i < wideSims.length; i++) {
+      const w = i + 1;
+      wSum += wideSims[i] * w;
+      wTotal += w;
+    }
+    avgWide = wSum / wTotal;
+  }
 
   // Blend: 60% consecutive, 40% wide comparison
   const blendedSimilarity = avgConsecutive * 0.6 + avgWide * 0.4;
@@ -68,10 +88,11 @@ export function calculateAnchorDrift(messages: ChatMessage[], userGoal?: string)
   const userMessages = messages.filter(m => m.role === 'user');
   if (userMessages.length < 2) return 0;
 
-  // Anchor = explicit user goal if set, otherwise first 1-2 user messages
+  // Anchor = explicit user goal if set, otherwise first 3 substantive user messages (>20 chars).
+  // Filtering short messages avoids anchoring on "yes", "ok", "go ahead" openers.
   const anchorDoc = userGoal
     ? userGoal
-    : userMessages.slice(0, Math.min(2, userMessages.length)).map(m => m.content).join(' ');
+    : userMessages.filter(m => m.content.trim().length > 20).slice(0, 3).map(m => m.content).join(' ');
 
   // Recent = last 3 messages (current state of conversation)
   const recentMessages = messages.slice(-3);
@@ -442,23 +463,6 @@ function createWindows(messages: ChatMessage[], windowSize: number): string[][] 
 // Topic term extraction (used by handoff prompt)
 // ============================================================
 
-/**
- * Return the top N most frequent meaningful terms across all messages.
- * Uses the same tokenizer (stop-word removal, min length 4) as topic entropy.
- * Useful for generating human-readable topic summaries in handoff prompts.
- */
-export function extractTopTerms(messages: ChatMessage[], n: number = 5): string[] {
-  const freq = new Map<string, number>();
-  for (const msg of messages) {
-    for (const term of tokenize(msg.content)) {
-      freq.set(term, (freq.get(term) ?? 0) + 1);
-    }
-  }
-  return [...freq.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, n)
-    .map(([term]) => term);
-}
 
 // ============================================================
 // N-gram utilities (used by repetition detection)

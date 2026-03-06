@@ -95,23 +95,29 @@ describe('calculateConfidenceDrift', () => {
     expect(score).toBeLessThanOrEqual(100);
   });
 
-  it('returns a higher score for sessions with heavy hedging versus clean sessions', () => {
-    const hedgySession = conversation([
-      ['?', 'I think this might possibly work, but perhaps it could be wrong.'],
-      ['?', 'Maybe, it seems like it could perhaps be the case, I am not sure.'],
-      ['?', 'I believe this might be right but I am uncertain, possibly wrong.'],
-      ['?', 'Perhaps this could maybe work, though I am not entirely confident.'],
-    ]);
-
-    const cleanSession = conversation([
+  it('returns a higher score when hedging increases over time versus staying constant', () => {
+    // Increasing hedging: confident early, very uncertain late
+    const increasingHedge = conversation([
       ['?', 'Use the sort() function. It sorts in ascending order by default.'],
       ['?', 'Set reverse=True for descending order. This is well-documented.'],
-      ['?', 'The key parameter accepts any callable. Use lambda x: x["age"].'],
-      ['?', 'Stable sort is guaranteed in Python. The algorithm is Timsort.'],
+      ['?', 'I think this might work, but I am not entirely sure.'],
+      ['?', 'Perhaps this could maybe work, though I am not confident.'],
+      ['?', 'I believe this might be right but I am uncertain, possibly wrong.'],
+      ['?', 'I am really not sure, it seems like it could perhaps be the case.'],
     ]);
 
-    expect(calculateConfidenceDrift(hedgySession)).toBeGreaterThan(
-      calculateConfidenceDrift(cleanSession),
+    // Constant hedging throughout (no trend)
+    const constantHedge = conversation([
+      ['?', 'I think this might work, but perhaps it could be wrong.'],
+      ['?', 'Maybe, it seems like it could perhaps be the case.'],
+      ['?', 'I believe this might be right but I am uncertain.'],
+      ['?', 'Perhaps this could maybe work, though I am not confident.'],
+      ['?', 'I think this might work, but perhaps it could be wrong.'],
+      ['?', 'Maybe, it seems like it could perhaps be the case.'],
+    ]);
+
+    expect(calculateConfidenceDrift(increasingHedge)).toBeGreaterThan(
+      calculateConfidenceDrift(constantHedge),
     );
   });
 });

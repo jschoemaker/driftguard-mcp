@@ -56,20 +56,20 @@ export function calculateDrift(
     contextSaturation: calcMessageDecay(messages),
     topicScatter: calculateTopicEntropy(messages),
     uncertaintySignals: calcContradictionScore(messages),
-    codeInconsistency: calcCodeInconsistency(messages),
     repetition: calcRepetition(messages),
     goalDistance: calculateAnchorDrift(messages, userGoal),
     confidenceDrift: calculateConfidenceDrift(messages),
+    responseLengthCollapse: calcResponseLengthCollapse(messages),
   };
 
   const score = Math.min(100, Math.max(0, Math.round(
     factors.contextSaturation * weights.contextSaturation +
     factors.topicScatter * weights.topicScatter +
     factors.uncertaintySignals * weights.uncertaintySignals +
-    factors.codeInconsistency * weights.codeInconsistency +
     factors.repetition * weights.repetition +
     factors.goalDistance * weights.goalDistance +
-    factors.confidenceDrift * weights.confidenceDrift
+    factors.confidenceDrift * weights.confidenceDrift +
+    factors.responseLengthCollapse * weights.responseLengthCollapse
   )));
 
   const level = scoreToLevel(score);
@@ -179,23 +179,6 @@ function calcContradictionScore(messages: ChatMessage[]): number {
   // Normalize: 0 contradictions = 0, 5+ = 80-100
   const score = Math.min(100, (totalContradictions / 5) * 80);
   return Math.round(score);
-}
-
-/**
- * Code Inconsistency: detects language/framework switches in coding sessions.
- */
-function calcCodeInconsistency(messages: ChatMessage[]): number {
-  const codeBlocks = extractCodeBlocks(messages);
-  if (codeBlocks.length < 2) return 0;
-
-  const languages = new Set(
-    codeBlocks.map(b => b.language).filter(l => l !== 'unknown'),
-  );
-  if (languages.size <= 1) return 0;
-
-  // Gradual scale: 2 langs = 35, 3 = 55, 4 = 75, 5+ = 95-100
-  const score = Math.min(100, Math.round(15 + (languages.size - 1) * 20));
-  return score;
 }
 
 /**
@@ -344,38 +327,44 @@ function charSimilarity(a: string, b: string): number {
   return Math.max(positionalScore, bigramScore);
 }
 
+/**
+ * Response Length Collapse: measures whether assistant responses are getting
+ * shorter over the session. A significant drop in average response length
+ * indicates the model is producing less thorough answers — a reliable sign
+ * of context degradation.
+ */
+function calcResponseLengthCollapse(messages: ChatMessage[]): number {
+  const assistantMsgs = messages
+    .filter(m => m.role === 'assistant' && m.content.trim().length > 10);
+  if (assistantMsgs.length < 6) return 0;
+
+  const quarter = Math.max(2, Math.floor(assistantMsgs.length / 4));
+  const earlyMsgs = assistantMsgs.slice(0, quarter);
+  const lateMsgs = assistantMsgs.slice(-quarter);
+
+  const avgWords = (msgs: ChatMessage[]) =>
+    msgs.reduce((sum, m) => sum + m.content.split(/\s+/).filter(w => w.length > 0).length, 0) / msgs.length;
+
+  const earlyAvg = avgWords(earlyMsgs);
+  const lateAvg = avgWords(lateMsgs);
+
+  if (earlyAvg === 0) return 0;
+
+  const ratio = lateAvg / earlyAvg;
+
+  // Healthy: ratio >= 0.7 (responses may naturally shorten a bit)
+  // Mild collapse: 0.5–0.7 → 0–40
+  // Significant: 0.3–0.5 → 40–75
+  // Severe: < 0.3 → 75–100
+  if (ratio >= 0.7) return 0;
+  if (ratio >= 0.5) return Math.round(((0.7 - ratio) / 0.2) * 40);
+  if (ratio >= 0.3) return Math.round(40 + ((0.5 - ratio) / 0.2) * 35);
+  return Math.min(100, Math.round(75 + ((0.3 - ratio) / 0.3) * 25));
+}
+
 // ============================================================
 // Helpers
 // ============================================================
-
-interface CodeBlock {
-  language: string;
-  content: string;
-}
-
-function extractCodeBlocks(messages: ChatMessage[]): CodeBlock[] {
-  const blocks: CodeBlock[] = [];
-
-  for (const msg of messages) {
-    for (const match of msg.content.matchAll(/```(\w*)\n([\s\S]*?)```/g)) {
-      const language = detectLanguage(match[1], match[2]);
-      blocks.push({ language, content: match[2] });
-    }
-  }
-
-  return blocks;
-}
-
-function detectLanguage(label: string, content: string): string {
-  if (label) return label.toLowerCase();
-
-  if (content.includes('import React') || content.includes('useState')) return 'jsx';
-  if (content.includes('def ') && content.includes(':')) return 'python';
-  if (content.includes('func ') && content.includes('{')) return 'go';
-  if (content.includes('fn ') && content.includes('->')) return 'rust';
-  if (content.includes('function') || content.includes('const ')) return 'javascript';
-  return 'unknown';
-}
 
 function generateRecommendations(score: number, factors: DriftFactors): string[] {
   const recs: string[] = [];
@@ -394,9 +383,6 @@ function generateRecommendations(score: number, factors: DriftFactors): string[]
   if (factors.uncertaintySignals > 40) {
     recs.push('AI is self-correcting frequently — context may be confused. Re-state your requirements.');
   }
-  if (factors.codeInconsistency > 30) {
-    recs.push('Multiple languages/frameworks in one chat — start a new chat for each tech stack.');
-  }
   if (factors.repetition > 30) {
     recs.push('AI is repeating itself — context is degrading. Start a new conversation.');
   }
@@ -405,6 +391,9 @@ function generateRecommendations(score: number, factors: DriftFactors): string[]
   }
   if (factors.confidenceDrift > 40) {
     recs.push('AI confidence is declining — context may be becoming unreliable. Verify assumptions.');
+  }
+  if (factors.responseLengthCollapse > 40) {
+    recs.push('AI responses are getting shorter — may be losing context depth. Consider starting fresh.');
   }
 
   if (score > 80) {
@@ -422,10 +411,10 @@ function emptyAnalysis(weights: DriftWeights): DriftAnalysis {
       contextSaturation: 0,
       topicScatter: 0,
       uncertaintySignals: 0,
-      codeInconsistency: 0,
       repetition: 0,
       goalDistance: 0,
       confidenceDrift: 0,
+      responseLengthCollapse: 0,
     },
     weights,
     messageCount: 0,

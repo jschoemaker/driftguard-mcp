@@ -15,34 +15,20 @@ import { ChatMessage } from './types';
 const HEDGING_PATTERNS = {
   // Modal verbs + uncertainty
   modalUncertainty: [
-    'might', 'may', 'could', 'could be', 'appears to be', 'seems to be',
+    'might', 'may', 'could be', 'appears to be', 'seems to be',
     'appears', 'seems', 'possibly', 'arguably', 'allegedly',
   ],
 
-  // Adverbs of uncertainty
+  // Adverbs of genuine uncertainty
   uncertainAdverbs: [
-    'probably', 'likely', 'perhaps', 'maybe', 'somewhat', 'relatively',
-    'quite', 'fairly', 'rather', 'approximately', 'roughly', 'sort of',
-    'kind of', 'a bit', 'a little',
+    'probably', 'likely', 'perhaps', 'maybe', 'approximately', 'roughly',
   ],
 
   // Epistemic markers (subjective speech)
   epistemicMarkers: [
     'I think', 'I believe', 'in my opinion', 'in my view',
     'it seems', 'it appears', 'I would say', 'I\'d say',
-  ],
-
-  // Downgraders (reduce force of statement)
-  downgraders: [
-    'just', 'only', 'merely', 'simply', 'barely', 'scarcely',
-    'somewhat', 'not quite', 'not entirely', 'not fully',
-  ],
-
-  // Negation reversals (contradicting prior claims)
-  negationPatterns: [
-    'actually', 'wait', 'hold on', 'correction', 'let me correct',
-    'upon reflection', 'on second thought', 'rethinking', 'mistake',
-    'I was wrong', 'I apologize', 'I retract',
+    'I\'m not sure', 'I\'m not certain', 'I\'m unsure',
   ],
 };
 
@@ -99,63 +85,10 @@ export function trackConfidenceTrend(messages: ChatMessage[]): number {
 }
 
 /**
- * Detects negation reversals — assistant contradicting itself with
- * explicit corrections ("actually", "I was wrong", etc.).
- * Returns 0-100 indicating frequency and severity.
- */
-export function detectNegationReversals(messages: ChatMessage[]): number {
-  const assistantMessages = messages.filter(m => m.role === 'assistant');
-  if (assistantMessages.length < 2) return 0;
-
-  let reversalCount = 0;
-
-  // Look for reversal patterns in each message
-  for (const msg of assistantMessages) {
-    const lower = msg.content.toLowerCase();
-    for (const pattern of HEDGING_PATTERNS.negationPatterns) {
-      const regex = new RegExp(`\\b${pattern}\\b`, 'gi');
-      if (regex.test(lower)) {
-        reversalCount += 1;
-        break; // Count per message, not per pattern occurrence
-      }
-    }
-  }
-
-  // Normalize: each reversal is 5 points per message
-  const baseScore = (reversalCount / assistantMessages.length) * 50;
-  // Bonus if reversals are later in conversation (shows growing confusion)
-  const lateReversals = assistantMessages.slice(-Math.ceil(assistantMessages.length / 3));
-  const lateReversalCount = lateReversals.filter(m => {
-    const lower = m.content.toLowerCase();
-    return HEDGING_PATTERNS.negationPatterns.some(p => new RegExp(`\\b${p}\\b`, 'i').test(lower));
-  }).length;
-
-  const lateBonus = (lateReversalCount / Math.max(lateReversals.length, 1)) * 30;
-
-  return Math.min(100, Math.round(baseScore + lateBonus));
-}
-
-/**
- * Composite confidence drift score combining all metrics.
- * Returns 0-100 indicating overall decline in assistant confidence.
+ * Confidence drift score: measures whether hedging language is INCREASING
+ * over the session (early vs late assistant messages). Absolute hedging level
+ * is ignored — only the trend matters.
  */
 export function calculateConfidenceDrift(messages: ChatMessage[]): number {
-  if (messages.length < 2) return 0;
-
-  const hedgingScore = messages
-    .filter(m => m.role === 'assistant')
-    .reduce((sum, m) => sum + detectHedgingLanguage(m.content), 0) /
-    Math.max(messages.filter(m => m.role === 'assistant').length, 1);
-
-  const trendScore = trackConfidenceTrend(messages);
-  const reversalScore = detectNegationReversals(messages);
-
-  // Weighted combination: hedging base (40%), trend (35%), reversals (25%)
-  const composite = Math.round(
-    hedgingScore * 0.40 +
-    trendScore * 0.35 +
-    reversalScore * 0.25
-  );
-
-  return Math.min(100, composite);
+  return Math.min(100, trackConfidenceTrend(messages));
 }

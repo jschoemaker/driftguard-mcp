@@ -28,33 +28,33 @@ export interface ChatMessage {
 // --- Drift Analysis ---
 
 export interface DriftFactors {
-  contextSaturation: number;  // 0-100: token depth + readability (Flesch-Kincaid)
-  topicScatter: number;       // 0-100: topic fragmentation (TF-IDF cosine similarity)
-  uncertaintySignals: number; // 0-100: self-correction & hedging language
-  codeInconsistency: number;  // 0-100: language/framework switches
-  repetition: number;         // 0-100: repeated content (3-gram + keyword Jaccard)
-  goalDistance: number;       // 0-100: semantic distance from original goal
-  confidenceDrift: number;    // 0-100: confidence degradation over time (hedging trend)
+  contextSaturation: number;      // 0-100: token depth (real API counts where available)
+  topicScatter: number;           // 0-100: topic fragmentation (TF-IDF cosine similarity)
+  uncertaintySignals: number;     // 0-100: explicit self-corrections
+  repetition: number;             // 0-100: repeated content (3-gram sliding window)
+  goalDistance: number;           // 0-100: semantic distance from original goal
+  confidenceDrift: number;        // 0-100: hedging language trend (early vs late)
+  responseLengthCollapse: number; // 0-100: assistant response length decline (early vs late)
 }
 
 export interface DriftWeights {
-  contextSaturation: number;  // default 0.20: context depth saturation (Lost in the Middle)
-  topicScatter: number;       // default 0.12: topic fragmentation
-  uncertaintySignals: number; // default 0.15: uncertainty indicators (Kadavath et al.)
-  codeInconsistency: number;  // default 0.08: code language switching
-  repetition: number;         // default 0.20: content repetition (Holtzman et al.)
-  goalDistance: number;       // default 0.15: distance from original goal
-  confidenceDrift: number;    // default 0.10: confidence degradation trend
+  contextSaturation: number;      // default 0.35 — most reliable: real token depth
+  topicScatter: number;           // default 0.04 — noisy: lexical not semantic
+  uncertaintySignals: number;     // default 0.02 — high precision, low recall
+  repetition: number;             // default 0.35 — most reliable: model recycling output
+  goalDistance: number;           // default 0.08 — lexical proxy, noisy
+  confidenceDrift: number;        // default 0.01 — trend signal, supporting only
+  responseLengthCollapse: number; // default 0.15 — reliable symptom of degradation
 }
 
 export const DEFAULT_WEIGHTS: DriftWeights = {
-  contextSaturation: 0.20,
-  topicScatter: 0.12,
-  uncertaintySignals: 0.15,
-  codeInconsistency: 0.08,
-  repetition: 0.20,
-  goalDistance: 0.15,
-  confidenceDrift: 0.10,
+  contextSaturation: 0.35,
+  topicScatter: 0.04,
+  uncertaintySignals: 0.02,
+  repetition: 0.35,
+  goalDistance: 0.08,
+  confidenceDrift: 0.01,
+  responseLengthCollapse: 0.15,
 };
 
 export interface DriftAnalysis {

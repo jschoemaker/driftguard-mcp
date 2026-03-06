@@ -4,7 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { SessionResolver } from './watchers/session-resolver';
 import { calculateDrift } from './core/drift-calculator';
-import { scoreToLevel } from './core/types';
+import { DriftAnalysis } from './core/types';
 import { loadConfig } from './config';
 import { Storage } from './storage';
 import { renderTrend, sparkline } from './ui';
@@ -25,8 +25,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: 'get_drift',
-      description: 'Returns the current drift score and factor breakdown for the active Claude Code session. Call this to check if the conversation context is degrading.',
-      inputSchema: { type: 'object', properties: {} },
+      description: 'Returns the current drift score and factor breakdown for the active Claude Code session. Call this to check if the conversation context is degrading. Optionally pass a "goal" string to anchor goalDistance scoring to a specific objective.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          goal: {
+            type: 'string',
+            description: "Optional: the user's original goal or task for this session. Improves goalDistance accuracy.",
+          },
+        },
+      },
     },
     {
       name: 'get_handoff',
@@ -41,12 +49,78 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   ],
 }));
 
-const LEVEL_EMOJI: Record<string, string> = {
-  fresh: '🟢',
-  warming: '🟡',
-  drifting: '🔴',
-  polluted: '⚫',
-};
+function bar(score: number, width = 10): string {
+  const filled = Math.round(Math.min(100, Math.max(0, score)) / 100 * width);
+  return '█'.repeat(filled) + '░'.repeat(width - filled);
+}
+
+/**
+ * Build the get_drift() output.
+ * Leads with an actionable recommendation driven by contextSaturation + repetition.
+ * Score and factor details are secondary.
+ */
+function buildDriftOutput(
+  analysis: DriftAnalysis,
+  messageCount: number,
+  trendLine: string,
+  adapterTag: string,
+): string {
+  const { factors, score } = analysis;
+
+  // Recommendation driven by the two reliable primary signals
+  const needsFreshNow  = factors.contextSaturation > 70 || factors.repetition > 65;
+  const needsFreshSoon = factors.contextSaturation > 50 || factors.repetition > 45;
+  const warming        = factors.contextSaturation > 35 || factors.repetition > 30;
+
+  let headline: string;
+  if (needsFreshNow) {
+    const reasons: string[] = [];
+    if (factors.contextSaturation > 70) reasons.push('context is full');
+    if (factors.repetition > 65) reasons.push('responses are repeating heavily');
+    headline = `⚠️  Start fresh now — ${reasons.join(' and ')}.`;
+  } else if (needsFreshSoon) {
+    const reasons: string[] = [];
+    if (factors.contextSaturation > 50) reasons.push('context is getting deep');
+    if (factors.repetition > 45) reasons.push('some repetition detected');
+    headline = `🟡  Start fresh soon — ${reasons.join(' and ')}.`;
+  } else if (warming) {
+    headline = `🟡  Context is warming up — no action needed yet.`;
+  } else {
+    headline = `✅  Context is healthy.`;
+  }
+
+  // Factor rows — always show primary two, show others only when non-trivial
+  const rows: string[] = [];
+  const row = (label: string, val: number) => {
+    rows.push(`  ${label.padEnd(20)} ${bar(val)}  ${String(Math.round(val)).padStart(3)}`);
+  };
+
+  row('Context depth', factors.contextSaturation);
+  row('Repetition', factors.repetition);
+  if (factors.responseLengthCollapse > 5)  row('Length collapse', factors.responseLengthCollapse);
+  if (factors.goalDistance > 20)           row('Goal distance', factors.goalDistance);
+  if (factors.topicScatter > 20)           row('Topic scatter', factors.topicScatter);
+  if (factors.uncertaintySignals > 10)     row('Uncertainty', factors.uncertaintySignals);
+  if (factors.confidenceDrift > 10)        row('Confidence drift', factors.confidenceDrift);
+
+  const lines = [
+    headline,
+    '',
+    ...rows,
+    '',
+    `Score: ${score}/100 · ${messageCount} messages${adapterTag}`,
+  ];
+
+  if (trendLine) lines.push(trendLine);
+
+  // Auto-trigger handoff suggestion when primary signals are high — independent of composite score
+  const shouldHandoff = factors.contextSaturation > 60 || factors.repetition > 50;
+  if (shouldHandoff) {
+    lines.push('', '→ Call get_handoff() to write handoff.md before starting fresh.');
+  }
+
+  return lines.join('\n');
+}
 
 function buildHandoff(): string {
   return [
@@ -103,9 +177,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     ...(m.toolTokens !== undefined ? { toolTokens: m.toolTokens } : {}),
   }));
 
-  const analysis = calculateDrift(chatMessages, config.weights);
-  const level = scoreToLevel(analysis.score);
-  const emoji = LEVEL_EMOJI[level] ?? '❓';
+  const goal = typeof request.params.arguments?.goal === 'string'
+    ? request.params.arguments.goal
+    : undefined;
+
+  const analysis = calculateDrift(chatMessages, config.weights, goal);
   const adapterTag = adapter.name !== 'claude' ? ` (${adapter.name})` : '';
 
   if (request.params.name === 'get_drift') {
@@ -123,31 +199,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
     }
 
-    const factors = Object.entries(analysis.factors)
-      .map(([k, v]) => `  ${k}: ${(v as number).toFixed(1)}`)
-      .join('\n');
-
-    const isDegrading = analysis.score > config.warnThreshold;
-
-    const lines = [
-      `Drift Score: ${analysis.score} ${emoji} ${level.toUpperCase()}${adapterTag}`,
-      `Messages: ${messages.length}`,
-      ``,
-      `Factor breakdown:`,
-      factors,
-      ``,
-      isDegrading
-        ? `⚠️ Context is degrading.`
-        : `Context is healthy.`,
-    ];
-
-    if (trendLine) lines.push(``, trendLine);
-
-    if (isDegrading) {
-      lines.push(``, `---`, buildHandoff());
-    }
-
-    return { content: [{ type: 'text', text: lines.join('\n') }] };
+    return { content: [{ type: 'text', text: buildDriftOutput(analysis, messages.length, trendLine, adapterTag) }] };
   }
 
   if (request.params.name === 'get_handoff') {

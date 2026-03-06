@@ -82,6 +82,41 @@ describe('parseJSONL', () => {
     // The {"type":"summary",...} line should not appear in messages
     expect(messages.every(m => m.role === 'user' || m.role === 'assistant')).toBe(true);
   });
+
+  it('resets messages at compact_boundary — only post-compaction messages are returned', () => {
+    const fs = require('fs');
+    const tmpPath = path.join(os.tmpdir(), `driftcli-compact-${Date.now()}.jsonl`);
+    const lines = [
+      JSON.stringify({ type: 'user', uuid: 'u1', timestamp: 1000, message: { role: 'user', content: 'pre-compaction message' } }),
+      JSON.stringify({ type: 'assistant', uuid: 'a1', timestamp: 2000, message: { role: 'assistant', content: [{ type: 'text', text: 'pre-compaction reply' }] } }),
+      JSON.stringify({ type: 'compact_boundary', uuid: 'cb1', timestamp: 3000 }),
+      JSON.stringify({ type: 'user', uuid: 'u2', timestamp: 4000, message: { role: 'user', content: 'post-compaction message' } }),
+      JSON.stringify({ type: 'assistant', uuid: 'a2', timestamp: 5000, message: { role: 'assistant', content: [{ type: 'text', text: 'post-compaction reply' }] } }),
+    ];
+    fs.writeFileSync(tmpPath, lines.join('\n'));
+    const messages = parseJSONL(tmpPath);
+    fs.unlinkSync(tmpPath);
+
+    expect(messages.length).toBe(2);
+    expect(messages[0].content).toBe('post-compaction message');
+    expect(messages[1].content).toBe('post-compaction reply');
+  });
+
+  it('filters out tool noise messages like "Tool loaded."', () => {
+    const fs = require('fs');
+    const tmpPath = path.join(os.tmpdir(), `driftcli-noise-${Date.now()}.jsonl`);
+    const lines = [
+      JSON.stringify({ type: 'user', uuid: 'u1', timestamp: 1000, message: { role: 'user', content: 'Tool loaded.' } }),
+      JSON.stringify({ type: 'user', uuid: 'u2', timestamp: 2000, message: { role: 'user', content: 'Real user message' } }),
+      JSON.stringify({ type: 'assistant', uuid: 'a1', timestamp: 3000, message: { role: 'assistant', content: [{ type: 'text', text: 'Real reply' }] } }),
+    ];
+    fs.writeFileSync(tmpPath, lines.join('\n'));
+    const messages = parseJSONL(tmpPath);
+    fs.unlinkSync(tmpPath);
+
+    expect(messages.length).toBe(2);
+    expect(messages.every(m => m.content !== 'Tool loaded.')).toBe(true);
+  });
 });
 
 describe('findLatestSession', () => {

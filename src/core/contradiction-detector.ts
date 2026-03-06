@@ -13,27 +13,12 @@ import { ChatMessage } from './types';
  */
 export function countContradictions(assistantMessages: ChatMessage[]): number {
   let count = 0;
-
-  for (let i = 0; i < assistantMessages.length; i++) {
-    const msg = assistantMessages[i];
-    const text = msg.content.toLowerCase();
-
-    // Direct self-correction patterns
-    count += countPatternMatches(text, CORRECTION_PATTERNS);
-
-    // Compare with previous assistant message for reversals
-    if (i > 0) {
-      const prevText = assistantMessages[i - 1].content.toLowerCase();
-      count += detectReversals(prevText, text);
-    }
+  for (const msg of assistantMessages) {
+    count += countPatternMatches(msg.content.toLowerCase(), CORRECTION_PATTERNS);
   }
-
   return count;
 }
 
-/**
- * Count how many correction patterns appear in the text.
- */
 function countPatternMatches(text: string, patterns: RegExp[]): number {
   let count = 0;
   for (const pattern of patterns) {
@@ -41,57 +26,6 @@ function countPatternMatches(text: string, patterns: RegExp[]): number {
     if (matches) count += matches.length;
   }
   return count;
-}
-
-/**
- * Detect when the AI reverses a previous statement.
- * E.g., "you should use X" followed by "don't use X"
- */
-function detectReversals(prevText: string, currentText: string): number {
-  let reversals = 0;
-
-  // Check for reversal signals: "actually" or correction phrases + negation
-  const hasReversalSignal = currentText.includes('actually') ||
-    currentText.includes('however') ||
-    currentText.includes('but ') ||
-    currentText.includes('instead') ||
-    // Dutch
-    currentText.includes('eigenlijk') ||
-    currentText.includes('echter') ||
-    currentText.includes('maar ') ||
-    // German
-    currentText.includes('eigentlich') ||
-    currentText.includes('allerdings') ||
-    currentText.includes('aber ') ||
-    currentText.includes('stattdessen') ||
-    // French
-    currentText.includes('en fait') ||
-    currentText.includes('cependant') ||
-    currentText.includes('mais ') ||
-    currentText.includes('plutôt') ||
-    // Spanish
-    currentText.includes('en realidad') ||
-    currentText.includes('sin embargo') ||
-    currentText.includes('pero ') ||
-    currentText.includes('en cambio') ||
-    // Portuguese
-    currentText.includes('na verdade') ||
-    currentText.includes('no entanto') ||
-    currentText.includes('mas ') ||
-    currentText.includes('em vez');
-
-  if (hasReversalSignal) {
-    for (const negation of NEGATION_PAIRS) {
-      if (
-        prevText.includes(negation.positive) &&
-        currentText.includes(negation.negative)
-      ) {
-        reversals++;
-      }
-    }
-  }
-
-  return reversals;
 }
 
 // Patterns that indicate the AI is correcting itself
@@ -169,41 +103,3 @@ const CORRECTION_PATTERNS: RegExp[] = [
   /eu (?:me enganei|me confundi|errei)/gi,
 ];
 
-// Pairs of positive/negative statements that indicate reversal
-const NEGATION_PAIRS = [
-  // English
-  { positive: 'you should', negative: "you shouldn't" },
-  { positive: 'you should', negative: 'you should not' },
-  { positive: 'recommend', negative: "don't recommend" },
-  { positive: 'recommend', negative: 'do not recommend' },
-  { positive: 'best practice', negative: 'not.+best practice' },
-  { positive: 'you can', negative: "you can't" },
-  { positive: 'you can', negative: 'you cannot' },
-  { positive: 'safe to', negative: 'not safe to' },
-  { positive: 'correct', negative: 'incorrect' },
-  // Dutch
-  { positive: 'je moet', negative: 'je moet niet' },
-  { positive: 'je kunt', negative: 'je kunt niet' },
-  { positive: 'aanbevolen', negative: 'niet aanbevolen' },
-  { positive: 'veilig', negative: 'niet veilig' },
-  // German
-  { positive: 'du solltest', negative: 'du solltest nicht' },
-  { positive: 'du kannst', negative: 'du kannst nicht' },
-  { positive: 'empfohlen', negative: 'nicht empfohlen' },
-  { positive: 'sicher', negative: 'nicht sicher' },
-  // French
-  { positive: 'vous devriez', negative: 'vous ne devriez pas' },
-  { positive: 'vous pouvez', negative: 'vous ne pouvez pas' },
-  { positive: 'recommandé', negative: 'pas recommandé' },
-  { positive: 'correct', negative: 'pas correct' },
-  // Spanish
-  { positive: 'deberías', negative: 'no deberías' },
-  { positive: 'puedes', negative: 'no puedes' },
-  { positive: 'recomendado', negative: 'no recomendado' },
-  { positive: 'seguro', negative: 'no es seguro' },
-  // Portuguese
-  { positive: 'você deveria', negative: 'você não deveria' },
-  { positive: 'você pode', negative: 'você não pode' },
-  { positive: 'recomendado', negative: 'não recomendado' },
-  { positive: 'seguro', negative: 'não é seguro' },
-];

@@ -16,10 +16,10 @@ const ZERO: DriftWeights = {
   contextSaturation: 0,
   topicScatter: 0,
   uncertaintySignals: 0,
-  codeInconsistency: 0,
   repetition: 0,
   goalDistance: 0,
   confidenceDrift: 0,
+  responseLengthCollapse: 0,
 };
 
 // ── 1. contextSaturation ─────────────────────────────────────────────────────
@@ -113,31 +113,7 @@ describe('factor: uncertaintySignals', () => {
   });
 });
 
-// ── 4. codeInconsistency ──────────────────────────────────────────────────────
-
-describe('factor: codeInconsistency', () => {
-  it('is 0 when all code is in the same language', () => {
-    const msgs = conversation([
-      ['show me a function', 'Sure:\n```python\ndef hello():\n    print("hello")\n```'],
-      ['and a class', 'Here:\n```python\nclass Foo:\n    def __init__(self):\n        self.x = 1\n```'],
-      ['and a loop', 'Like this:\n```python\nfor i in range(10):\n    print(i)\n```'],
-    ]);
-    const { factors } = calculateDrift(msgs, ZERO);
-    expect(factors.codeInconsistency).toBe(0);
-  });
-
-  it('rises when multiple languages appear', () => {
-    const msgs = conversation([
-      ['python example', '```python\ndef greet(name):\n    return f"Hello {name}"\n```'],
-      ['same in javascript', '```javascript\nfunction greet(name) {\n  return `Hello ${name}`;\n}\n```'],
-      ['same in go', '```go\nfunc greet(name string) string {\n    return "Hello " + name\n}\n```'],
-    ]);
-    const { factors } = calculateDrift(msgs, ZERO);
-    expect(factors.codeInconsistency).toBeGreaterThan(0);
-  });
-});
-
-// ── 5. repetition ─────────────────────────────────────────────────────────────
+// ── 4. repetition ─────────────────────────────────────────────────────────────
 
 describe('factor: repetition', () => {
   it('is 0 for a short conversation (below message threshold)', () => {
@@ -169,7 +145,7 @@ describe('factor: repetition', () => {
   });
 });
 
-// ── 6. goalDistance ───────────────────────────────────────────────────────────
+// ── 5. goalDistance ───────────────────────────────────────────────────────────
 
 describe('factor: goalDistance', () => {
   it('is 0 for a single-message session (no drift possible yet)', () => {
@@ -192,7 +168,7 @@ describe('factor: goalDistance', () => {
   });
 });
 
-// ── 7. confidenceDrift ────────────────────────────────────────────────────────
+// ── 6. confidenceDrift ────────────────────────────────────────────────────────
 
 describe('factor: confidenceDrift', () => {
   it('is 0 for consistently confident assistant responses', () => {
@@ -208,14 +184,51 @@ describe('factor: confidenceDrift', () => {
 
   it('rises when assistant responses contain increasing hedging language', () => {
     const msgs = conversation([
-      ['is this correct?', 'Yes, that is definitely the right approach.'],
-      ['and this?', 'I think that might work, though I am not entirely certain.'],
-      ['what about this?', 'I am not sure, perhaps it could work, but I would need to verify.'],
-      ['is this right?', 'I am really uncertain here, I might be wrong, possibly this could be one option.'],
-      ['confirm please', 'I cannot say for certain, I am unsure, it might be the case, hard to tell.'],
-      ['any idea?', 'I doubt my answer here, I am not confident, I could be mistaken, unclear to me.'],
+      ['q1', 'Use Express. That is the standard approach for Node.js servers.'],
+      ['q2', 'PostgreSQL is correct here. It handles this well.'],
+      ['q3', 'I think this might work, but I am not entirely sure about it.'],
+      ['q4', 'Perhaps this could be right, though I am uncertain whether it applies.'],
+      ['q5', 'I believe this might be the case, possibly, but I am not confident.'],
+      ['q6', 'I think this might work perhaps, though I am not sure, it seems like it could be.'],
     ]);
     const { factors } = calculateDrift(msgs, ZERO);
     expect(factors.confidenceDrift).toBeGreaterThan(0);
+  });
+});
+
+// ── 7. responseLengthCollapse ─────────────────────────────────────────────────
+
+describe('factor: responseLengthCollapse', () => {
+  it('is 0 for a short session (below message threshold)', () => {
+    const msgs = conversation([
+      ['q', 'Short answer.'],
+      ['q', 'Short answer.'],
+      ['q', 'Short answer.'],
+    ]);
+    const { factors } = calculateDrift(msgs, ZERO);
+    expect(factors.responseLengthCollapse).toBe(0);
+  });
+
+  it('is 0 when response length stays consistent', () => {
+    const consistent = conversation(
+      Array.from({ length: 8 }, (_, i) => [
+        `question ${i}`,
+        'This is a detailed response that covers the topic thoroughly and provides useful context for the user to understand.',
+      ])
+    );
+    const { factors } = calculateDrift(consistent, ZERO);
+    expect(factors.responseLengthCollapse).toBe(0);
+  });
+
+  it('rises when late responses are much shorter than early ones', () => {
+    const long = 'This is a thorough and detailed explanation covering all the key points and nuances of the topic at hand with many clear examples and extensive context to help the user understand fully.';
+    const short = 'Yes, done. Correct.';
+    const collapsing = conversation([
+      ['q1', long], ['q2', long], ['q3', long], ['q4', long],
+      ['q5', long], ['q6', long], ['q7', long], ['q8', long],
+      ['q9', short], ['q10', short], ['q11', short], ['q12', short],
+    ]);
+    const { factors } = calculateDrift(collapsing, ZERO);
+    expect(factors.responseLengthCollapse).toBeGreaterThan(0);
   });
 });

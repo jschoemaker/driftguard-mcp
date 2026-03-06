@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateTopicEntropy, extractTopTerms } from '../../src/core/topic-analyzer';
+import { calculateTopicEntropy } from '../../src/core/topic-analyzer';
 import { makeMsg, conversation } from '../helpers';
 
 describe('calculateTopicEntropy', () => {
@@ -54,49 +54,3 @@ describe('calculateTopicEntropy', () => {
   });
 });
 
-describe('extractTopTerms', () => {
-  it('returns an empty array for messages with no meaningful terms', () => {
-    const msgs = [makeMsg('user', 'ok hi bye the and'), makeMsg('assistant', 'yes no ok')];
-    // All words are short or stop words — may return empty
-    const terms = extractTopTerms(msgs, 5);
-    expect(Array.isArray(terms)).toBe(true);
-  });
-
-  it('returns at most n terms', () => {
-    const msgs = conversation([
-      ['React hooks useState useEffect', 'React hooks useState useEffect component'],
-      ['TypeScript interfaces generics', 'TypeScript interfaces generics types'],
-    ]);
-    expect(extractTopTerms(msgs, 3).length).toBeLessThanOrEqual(3);
-    expect(extractTopTerms(msgs, 1).length).toBeLessThanOrEqual(1);
-  });
-
-  it('returns the most frequent terms first', () => {
-    // "typescript" appears many more times than "banana"
-    const msgs = conversation([
-      ['typescript types typescript typescript', 'typescript generics typescript interfaces'],
-      ['typescript modules typescript typescript', 'typescript compilation typescript check banana'],
-    ]);
-    const terms = extractTopTerms(msgs, 10);
-    const tsIndex = terms.indexOf('typescript');
-    const bananaIndex = terms.indexOf('banana');
-    expect(tsIndex).toBeGreaterThanOrEqual(0);
-    if (bananaIndex >= 0) {
-      expect(tsIndex).toBeLessThan(bananaIndex);
-    }
-  });
-
-  it('filters out stop words and short words', () => {
-    const msgs = [makeMsg('user', 'the and for with this that from have will about javascript development')];
-    const terms = extractTopTerms(msgs, 20);
-    const stopWords = ['the', 'and', 'for', 'with', 'this', 'that', 'from', 'have', 'will'];
-    for (const sw of stopWords) {
-      expect(terms).not.toContain(sw);
-    }
-  });
-
-  it('works on an empty message list', () => {
-    expect(() => extractTopTerms([], 5)).not.toThrow();
-    expect(extractTopTerms([], 5)).toEqual([]);
-  });
-});

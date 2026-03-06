@@ -7,10 +7,10 @@ const ALL_ZERO_WEIGHTS: DriftWeights = {
   contextSaturation: 0,
   topicScatter: 0,
   uncertaintySignals: 0,
-  codeInconsistency: 0,
   repetition: 0,
   goalDistance: 0,
   confidenceDrift: 0,
+  responseLengthCollapse: 0,
 };
 
 describe('calculateDrift', () => {

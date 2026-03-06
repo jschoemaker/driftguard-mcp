@@ -34,6 +34,20 @@ function parseTimestamp(raw: unknown): number {
   return Date.now();
 }
 
+/**
+ * Short exact-match strings and patterns that indicate hook/system noise
+ * rather than real user content. Filtered out before scoring.
+ */
+const NOISE_PATTERNS: RegExp[] = [
+  /^Tool loaded\.\s*$/,
+  /^MCP server connected\.\s*$/,
+  /^MCP server disconnected\.\s*$/,
+];
+
+function isNoise(text: string): boolean {
+  return NOISE_PATTERNS.some(p => p.test(text));
+}
+
 export function parseJSONL(filePath: string): ParsedMessage[] {
   const raw = fs.readFileSync(filePath, 'utf-8');
   const lines = raw.split('\n').filter(l => l.trim());
@@ -43,6 +57,13 @@ export function parseJSONL(filePath: string): ParsedMessage[] {
   for (const line of lines) {
     try {
       const entry = JSON.parse(line);
+
+      // Compact boundary: Claude's context was reset by compaction.
+      // Drop all messages collected so far — they are no longer in Claude's context.
+      if (entry.type === 'compact_boundary') {
+        messages.length = 0;
+        continue;
+      }
 
       if (entry.type !== 'user' && entry.type !== 'assistant') continue;
 
@@ -80,6 +101,21 @@ export function parseJSONL(filePath: string): ParsedMessage[] {
       }
 
       if (!text.trim()) continue;
+      if (isNoise(text)) continue;
+
+      // Real input token count from Claude API usage field.
+      // Total context = input_tokens + cache_creation_input_tokens + cache_read_input_tokens.
+      // Only present on assistant messages; used by contextSaturation instead of estimation.
+      let inputTokens: number | undefined;
+      if (entry.type === 'assistant') {
+        const usage = entry.message?.usage;
+        if (usage) {
+          const total = (usage.input_tokens ?? 0)
+            + (usage.cache_creation_input_tokens ?? 0)
+            + (usage.cache_read_input_tokens ?? 0);
+          if (total > 0) inputTokens = total;
+        }
+      }
 
       messages.push({
         id: entry.uuid,
@@ -87,6 +123,7 @@ export function parseJSONL(filePath: string): ParsedMessage[] {
         content: text,
         timestamp: parseTimestamp(entry.timestamp),
         ...(toolTokens > 0 ? { toolTokens } : {}),
+        ...(inputTokens !== undefined ? { inputTokens } : {}),
       });
     } catch {
       skipped++;

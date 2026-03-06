@@ -57,14 +57,6 @@ describe('countContradictions', () => {
     expect(countContradictions(msgs)).toBeGreaterThan(0);
   });
 
-  it('detects negation reversal: "you should" → "you shouldn\'t"', () => {
-    const msgs = assistantMsgs(
-      'You should use global variables here.',
-      "Actually, you shouldn't use global variables. Use parameters instead.",
-    );
-    expect(countContradictions(msgs)).toBeGreaterThan(0);
-  });
-
   it('counts more contradictions in a heavily self-correcting session', () => {
     const contradicting = assistantMsgs(
       'You should use class A.',
