@@ -24,7 +24,8 @@ driftguard-mcp setup
 {
   "mcpServers": {
     "driftguard": {
-      "command": "driftguard-mcp"
+      "command": "driftguard-mcp",
+      "env": { "DRIFTCLI_ADAPTER": "claude" }
     }
   }
 }
@@ -36,7 +37,8 @@ driftguard-mcp setup
 {
   "mcpServers": {
     "driftguard": {
-      "command": "driftguard-mcp"
+      "command": "driftguard-mcp",
+      "env": { "DRIFTCLI_ADAPTER": "gemini" }
     }
   }
 }
@@ -48,7 +50,8 @@ driftguard-mcp setup
 {
   "mcpServers": {
     "driftguard": {
-      "command": "driftguard-mcp"
+      "command": "driftguard-mcp",
+      "env": { "DRIFTCLI_ADAPTER": "codex" }
     }
   }
 }
@@ -60,13 +63,16 @@ driftguard-mcp setup
 {
   "mcpServers": {
     "driftguard": {
-      "command": "driftguard-mcp"
+      "command": "driftguard-mcp",
+      "env": { "DRIFTCLI_ADAPTER": "claude" }
     }
   }
 }
 ```
 
-> Note: Cursor drift is calculated from any active Claude Code, Gemini CLI, or Codex CLI sessions on your machine — not from Cursor's own conversation history.
+> Note: Cursor drift is calculated from Claude Code sessions on your machine — not from Cursor's own conversation history.
+
+> **`DRIFTCLI_ADAPTER`** tells driftguard-mcp which CLI's sessions to read. Without it, the server falls back to whichever session file was modified most recently, which may be from a different CLI. `driftguard-mcp setup` sets this automatically.
 
 </details>
 
@@ -168,6 +174,14 @@ Both are plain JSON. All fields are optional.
 | `storage.enabled` | `true` | Persist drift snapshots for `get_trend()` and sparklines |
 | `storage.directory` | `~/.driftcli/history` | Override snapshot storage path |
 | `sessionResolution.cacheTtlMs` | `5000` | How long to cache the resolved session file (ms) |
+
+### Environment variables
+
+| Variable | Description |
+|----------|-------------|
+| `DRIFTCLI_ADAPTER` | Pin session lookup to a specific CLI: `claude`, `gemini`, or `codex`. Set automatically by `driftguard-mcp setup`. |
+| `DRIFTCLI_SESSION_ID` | Force a specific session UUID (Claude Code only). |
+| `DRIFTCLI_HOME` | Override the home directory used for session file discovery. |
 
 ---
 

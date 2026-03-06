@@ -3,16 +3,44 @@ import * as path from 'path';
 import * as os from 'os';
 import { ParserAdapter, ParsedMessage } from './adapter';
 
-interface ToolCall {
-  type: 'function';
-  function: { name: string; arguments: string };
+interface UserMessagePayload {
+  type: 'user_message';
+  message: string;
 }
 
+interface AgentMessagePayload {
+  type: 'agent_message';
+  message: string;
+}
+
+interface ExecCommandEndPayload {
+  type: 'ExecCommandEnd';
+  aggregated_output?: string;
+}
+
+interface TokenUsage {
+  input_tokens?: number;
+  cached_input_tokens?: number;
+  output_tokens?: number;
+  reasoning_output_tokens?: number;
+  total_tokens?: number;
+}
+
+interface TokenCountPayload {
+  type: 'token_count';
+  info?: {
+    total_token_usage?: TokenUsage;
+    last_token_usage?: TokenUsage;
+    model_context_window?: number;
+  } | null;
+}
+
+type EventPayload = UserMessagePayload | AgentMessagePayload | ExecCommandEndPayload | TokenCountPayload | { type: string };
+
 interface CodexLine {
-  role: 'user' | 'assistant' | 'tool';
-  content: string | Array<{ type: string; text?: string; input?: Record<string, unknown> }>;
-  tool_calls?: ToolCall[];
-  timestamp?: string | number;
+  timestamp?: string;
+  type: 'event_msg' | 'session_meta' | string;
+  payload?: EventPayload;
 }
 
 export class CodexAdapter implements ParserAdapter {
@@ -28,62 +56,49 @@ export class CodexAdapter implements ParserAdapter {
     const messages: ParsedMessage[] = [];
     let index = 0;
     let pendingToolTokens = 0;
+    let pendingInputTokens: number | undefined;
 
     for (const line of lines) {
       try {
         const entry = JSON.parse(line) as CodexLine;
 
-        // role:tool lines are tool results — count their tokens and carry forward
-        if (entry.role === 'tool') {
-          const resultText = typeof entry.content === 'string' ? entry.content : '';
-          pendingToolTokens += Math.round(resultText.length / 4);
+        if (entry.type !== 'event_msg' || !entry.payload) continue;
+
+        const payload = entry.payload;
+
+        if (payload.type === 'token_count') {
+          const tc = payload as TokenCountPayload;
+          const usage = tc.info?.total_token_usage;
+          if (usage?.input_tokens) pendingInputTokens = usage.input_tokens;
+          if (usage?.reasoning_output_tokens) pendingToolTokens += usage.reasoning_output_tokens;
           continue;
         }
 
-        if (entry.role !== 'user' && entry.role !== 'assistant') continue;
-
-        let text = '';
-        let toolTokens = pendingToolTokens;
-        pendingToolTokens = 0;
-
-        if (typeof entry.content === 'string') {
-          text = entry.content.trim();
-        } else if (Array.isArray(entry.content)) {
-          for (const block of entry.content) {
-            if (block.type === 'text' && typeof block.text === 'string') {
-              text += (text ? '\n' : '') + block.text.trim();
-            } else if (block.type === 'tool_use' && block.input) {
-              toolTokens += Math.round(JSON.stringify(block.input).length / 4);
-            }
-          }
-          text = text.trim();
+        if (payload.type === 'ExecCommandEnd') {
+          const output = (payload as ExecCommandEndPayload).aggregated_output ?? '';
+          pendingToolTokens += Math.round(output.length / 4);
+          continue;
         }
 
-        // OpenAI-style tool_calls array on assistant messages
-        if (entry.tool_calls) {
-          for (const tc of entry.tool_calls) {
-            if (tc.function?.arguments) {
-              toolTokens += Math.round(tc.function.arguments.length / 4);
-            }
-          }
-        }
+        if (payload.type !== 'user_message' && payload.type !== 'agent_message') continue;
 
+        const text = ((payload as UserMessagePayload | AgentMessagePayload).message ?? '').trim();
         if (!text) continue;
 
-        let ts = Date.now();
-        if (entry.timestamp) {
-          const parsed = typeof entry.timestamp === 'number'
-            ? entry.timestamp
-            : new Date(entry.timestamp).getTime();
-          if (isFinite(parsed)) ts = parsed;
-        }
+        const role = payload.type === 'agent_message' ? 'assistant' : 'user';
+        const ts = entry.timestamp ? new Date(entry.timestamp).getTime() : Date.now();
+        const toolTokens = pendingToolTokens;
+        pendingToolTokens = 0;
+        const inputTokens = pendingInputTokens;
+        pendingInputTokens = undefined;
 
         messages.push({
           id: `codex-${index++}`,
-          role: entry.role as 'user' | 'assistant',
+          role,
           content: text,
-          timestamp: ts,
+          timestamp: isFinite(ts) ? ts : Date.now(),
           ...(toolTokens > 0 ? { toolTokens } : {}),
+          ...(inputTokens !== undefined ? { inputTokens } : {}),
         });
       } catch {
         // skip malformed lines

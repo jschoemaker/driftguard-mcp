@@ -1,6 +1,7 @@
-{"role":"user","content":"How do I reverse a string in JavaScript?","timestamp":"2024-01-01T10:00:00Z"}
-{"role":"assistant","content":"You can reverse a string by splitting it into an array, reversing, and joining:\n\n```js\nconst reversed = str.split('').reverse().join('');\n```","timestamp":"2024-01-01T10:00:05Z"}
-{"role":"user","content":"What about using a for loop instead?","timestamp":"2024-01-01T10:01:00Z"}
-{"role":"assistant","content":"Let me read the example file.","tool_calls":[{"type":"function","function":{"name":"read_file","arguments":"{\"path\":\"example.js\"}"}}],"timestamp":"2024-01-01T10:01:10Z"}
-{"role":"tool","content":"for (let i = str.length - 1; i >= 0; i--) result += str[i];","timestamp":"2024-01-01T10:01:15Z"}
-{"role":"user","content":"Thanks, that makes sense.","timestamp":"2024-01-01T10:01:20Z"}
+{"timestamp":"2024-01-01T10:00:00Z","type":"event_msg","payload":{"type":"user_message","message":"How do I reverse a string in JavaScript?"}}
+{"timestamp":"2024-01-01T10:00:05Z","type":"event_msg","payload":{"type":"agent_message","message":"You can reverse a string by splitting it into an array, reversing, and joining:\n\n```js\nconst reversed = str.split('').reverse().join('');\n```"}}
+{"timestamp":"2024-01-01T10:01:00Z","type":"event_msg","payload":{"type":"user_message","message":"What about using a for loop instead?"}}
+{"timestamp":"2024-01-01T10:01:05Z","type":"event_msg","payload":{"type":"ExecCommandEnd","aggregated_output":"for (let i = str.length - 1; i >= 0; i--) result += str[i];","stdout":"","stderr":"","formatted_output":""}}
+{"timestamp":"2024-01-01T10:01:10Z","type":"event_msg","payload":{"type":"agent_message","message":"Here's how you do it with a for loop: iterate backwards and build up the result string."}}
+{"timestamp":"2024-01-01T10:01:20Z","type":"event_msg","payload":{"type":"user_message","message":"Thanks, that makes sense."}}
+{"timestamp":"2024-01-01T10:01:25Z","type":"session_meta","payload":{"conversation_id":"abc123","model":"gpt-4o"}}

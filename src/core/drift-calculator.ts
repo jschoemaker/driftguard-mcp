@@ -106,11 +106,22 @@ export function calculateDrift(
 function calcMessageDecay(messages: ChatMessage[]): number {
   let totalTokens = 0;
 
-  for (const msg of messages) {
-    const words = msg.content.split(/\s+/).filter(w => w.length > 0).length;
-    const hasCode = msg.content.includes('```');
-    const tokenEstimate = Math.round(words * 1.3 * (hasCode ? 1.5 : 1));
-    totalTokens += tokenEstimate + (msg.toolTokens ?? 0);
+  // Use exact API input token count when available (e.g. Gemini provides tokens.input).
+  // Take the latest value — it represents the cumulative context size at that turn.
+  const latestInputTokens = [...messages]
+    .reverse()
+    .find(m => (m.inputTokens ?? 0) > 0)
+    ?.inputTokens;
+
+  if (latestInputTokens !== undefined) {
+    totalTokens = latestInputTokens;
+  } else {
+    for (const msg of messages) {
+      const words = msg.content.split(/\s+/).filter(w => w.length > 0).length;
+      const hasCode = msg.content.includes('```');
+      const tokenEstimate = Math.round(words * 1.3 * (hasCode ? 1.5 : 1));
+      totalTokens += tokenEstimate + (msg.toolTokens ?? 0);
+    }
   }
 
   if (totalTokens < 500) return 0;

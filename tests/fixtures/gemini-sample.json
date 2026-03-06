@@ -1,0 +1,54 @@
+{
+  "sessionId": "test-session-id",
+  "projectHash": "abc123",
+  "startTime": "2024-01-01T10:00:00Z",
+  "lastUpdated": "2024-01-01T10:05:00Z",
+  "messages": [
+    {
+      "id": "msg-1",
+      "timestamp": "2024-01-01T10:00:00Z",
+      "type": "user",
+      "content": "How do I sort a list in Python?"
+    },
+    {
+      "id": "msg-2",
+      "timestamp": "2024-01-01T10:00:05Z",
+      "type": "gemini",
+      "content": "You can use the built-in sort() method or the sorted() function.",
+      "tokens": { "input": 100, "output": 50, "cached": 0, "thoughts": 0, "tool": 0, "total": 150 }
+    },
+    {
+      "id": "msg-3",
+      "timestamp": "2024-01-01T10:01:00Z",
+      "type": "user",
+      "content": "What about sorting in reverse order?"
+    },
+    {
+      "id": "msg-4",
+      "timestamp": "2024-01-01T10:01:10Z",
+      "type": "gemini",
+      "content": "Use sort(reverse=True) or sorted(..., reverse=True).",
+      "toolCalls": [
+        {
+          "id": "tc-1",
+          "name": "read_file",
+          "args": { "path": "sort_example.py" },
+          "result": { "output": "my_list.sort(reverse=True)" }
+        }
+      ],
+      "tokens": { "input": 200, "output": 20, "cached": 0, "thoughts": 0, "tool": 85, "total": 305 }
+    },
+    {
+      "id": "msg-5",
+      "timestamp": "2024-01-01T10:01:15Z",
+      "type": "user",
+      "content": "Got it."
+    },
+    {
+      "id": "msg-info",
+      "timestamp": "2024-01-01T10:01:20Z",
+      "type": "info",
+      "content": "Gemini CLI update available!"
+    }
+  ]
+}

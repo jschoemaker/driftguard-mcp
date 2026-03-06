@@ -1,7 +1,7 @@
 import { findLatestSession, findSessionByUUID, findSessionByCwd } from './claude-parser';
 import { ParserAdapter } from './adapter';
 import { ClaudeAdapter } from './claude-adapter';
-import { detectAdapter } from './adapter-registry';
+import { detectAdapter, getPinnedAdapter } from './adapter-registry';
 
 /**
  * Resolves the active session file using a priority chain:
@@ -29,7 +29,10 @@ export class SessionResolver {
       return this.cached.file;
     }
 
-    const result = this.resolveFromEnv() ?? this.resolveFromCwd() ?? findLatestSession();
+    const pinned = getPinnedAdapter();
+    const result = this.resolveFromEnv()
+      ?? this.resolveFromCwd(pinned)
+      ?? (pinned ? pinned.findLatest() : findLatestSession());
 
     if (result) {
       this.cached = { file: result, expiresAt: Date.now() + this.cacheTtlMs };
@@ -51,7 +54,9 @@ export class SessionResolver {
     this.cached = null;
   }
 
-  private resolveFromCwd(): string | null {
+  private resolveFromCwd(pinned: ParserAdapter | null): string | null {
+    // CWD match only applies to Claude sessions; skip if pinned to a different adapter
+    if (pinned && pinned.name !== 'claude') return null;
     const file = findSessionByCwd();
     if (file && process.env.DRIFTCLI_DEBUG) {
       const slug = file.split(/[\\/]/).slice(-2, -1)[0];

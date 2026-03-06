@@ -3,80 +3,111 @@ import * as path from 'path';
 import * as os from 'os';
 import { ParserAdapter, ParsedMessage } from './adapter';
 
-interface FunctionCall {
+interface GeminiToolCall {
+  id: string;
   name: string;
   args?: Record<string, unknown>;
+  result?: unknown;
 }
 
-interface FunctionResponse {
-  name: string;
-  response?: Record<string, unknown>;
+interface GeminiTokens {
+  tool?: number;
 }
 
-interface GeminiPart {
-  text?: string;
-  functionCall?: FunctionCall;
-  functionResponse?: FunctionResponse;
-}
-
-interface GeminiLine {
-  role: 'user' | 'model';
-  parts: GeminiPart[];
+interface GeminiMessage {
+  id: string;
   timestamp?: string;
+  type: 'user' | 'gemini' | 'info' | 'error';
+  content: string | Array<{ text?: string }>;
+  toolCalls?: GeminiToolCall[];
+  tokens?: GeminiTokens;
+}
+
+interface GeminiSession {
+  messages: GeminiMessage[];
 }
 
 export class GeminiAdapter implements ParserAdapter {
   readonly name = 'gemini';
 
   canParse(filePath: string): boolean {
-    return filePath.includes('.gemini') && filePath.endsWith('.jsonl');
+    return filePath.includes('.gemini') && filePath.endsWith('.json');
   }
 
   parse(filePath: string): ParsedMessage[] {
     const raw = fs.readFileSync(filePath, 'utf-8');
-    const lines = raw.split('\n').filter(l => l.trim());
+    let session: GeminiSession;
+    try {
+      session = JSON.parse(raw) as GeminiSession;
+    } catch {
+      return [];
+    }
+
+    if (!Array.isArray(session.messages)) return [];
+
     const messages: ParsedMessage[] = [];
     let index = 0;
+    // Carry tokens from empty-content gemini turns (tool-only / thinking-only) to next real message
+    let pendingToolTokens = 0;
+    let pendingInputTokens: number | undefined;
 
-    for (const line of lines) {
-      try {
-        const entry = JSON.parse(line) as GeminiLine;
-        if (entry.role !== 'user' && entry.role !== 'model') continue;
+    for (const msg of session.messages) {
+      if (msg.type !== 'user' && msg.type !== 'gemini') continue;
 
-        const parts = entry.parts ?? [];
+      let content: string;
+      if (typeof msg.content === 'string') {
+        content = msg.content.trim();
+      } else if (Array.isArray(msg.content)) {
+        content = msg.content.map((p: { text?: string }) => p.text ?? '').join('\n').trim();
+      } else {
+        continue;
+      }
 
-        const text = parts
-          .map(p => p.text ?? '')
-          .join('\n')
-          .trim();
-
-        if (!text) continue;
-
-        // Count tokens from tool call / tool result parts
-        let toolTokens = 0;
-        for (const part of parts) {
-          if (part.functionCall?.args) {
-            toolTokens += Math.round(JSON.stringify(part.functionCall.args).length / 4);
-          }
-          if (part.functionResponse?.response) {
-            toolTokens += Math.round(JSON.stringify(part.functionResponse.response).length / 4);
+      // Empty gemini turns (tool calls or pure thinking) — accumulate their tokens and skip
+      if (!content && msg.type === 'gemini') {
+        pendingToolTokens += msg.tokens?.tool ?? 0;
+        pendingToolTokens += msg.tokens?.thoughts ?? 0;
+        if ((msg.tokens?.tool ?? 0) === 0 && msg.toolCalls?.length) {
+          for (const tc of msg.toolCalls) {
+            if (tc.args) pendingToolTokens += Math.round(JSON.stringify(tc.args).length / 4);
+            if (tc.result) pendingToolTokens += Math.round(JSON.stringify(tc.result).length / 4);
           }
         }
-
-        const ts = entry.timestamp
-          ? new Date(entry.timestamp).getTime()
-          : Date.now();
-
-        messages.push({
-          id: `gemini-${index++}`,
-          role: entry.role === 'model' ? 'assistant' : 'user',
-          content: text,
-          timestamp: isFinite(ts) ? ts : Date.now(),
-          ...(toolTokens > 0 ? { toolTokens } : {}),
-        });
-      } catch {
-        // skip malformed lines
+        if (msg.tokens?.input) pendingInputTokens = msg.tokens.input;
+        continue;
       }
+
+      if (!content) continue; // skip empty user messages
+
+      const role = msg.type === 'gemini' ? 'assistant' : 'user';
+      const ts = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
+
+      // Merge pending tokens from preceding empty turns
+      let toolTokens = pendingToolTokens + (msg.tokens?.tool ?? 0);
+      pendingToolTokens = 0;
+
+      // Thoughts tokens consume real context even though they're not visible content
+      toolTokens += msg.tokens?.thoughts ?? 0;
+
+      // Fall back to estimating from toolCalls when API count unavailable
+      if ((msg.tokens?.tool ?? 0) === 0 && msg.toolCalls?.length) {
+        for (const tc of msg.toolCalls) {
+          if (tc.args) toolTokens += Math.round(JSON.stringify(tc.args).length / 4);
+          if (tc.result) toolTokens += Math.round(JSON.stringify(tc.result).length / 4);
+        }
+      }
+
+      const inputTokens = msg.tokens?.input ?? pendingInputTokens;
+      pendingInputTokens = undefined;
+
+      messages.push({
+        id: `gemini-${index++}`,
+        role,
+        content,
+        timestamp: isFinite(ts) ? ts : Date.now(),
+        ...(toolTokens > 0 ? { toolTokens } : {}),
+        ...(inputTokens !== undefined ? { inputTokens } : {}),
+      });
     }
 
     return messages;
@@ -100,10 +131,12 @@ export class GeminiAdapter implements ParserAdapter {
         .filter(d => { try { return fs.statSync(d).isDirectory(); } catch { return false; } });
 
       for (const dir of sessionDirs) {
+        const chatsDir = path.join(dir, 'chats');
+        if (!fs.existsSync(chatsDir)) continue;
         try {
-          const files = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl'));
+          const files = fs.readdirSync(chatsDir).filter(f => f.endsWith('.json'));
           for (const file of files) {
-            const fullPath = path.join(dir, file);
+            const fullPath = path.join(chatsDir, file);
             try {
               const mtime = fs.statSync(fullPath).mtimeMs;
               if (mtime > latestTime) {

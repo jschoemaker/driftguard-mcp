@@ -20,6 +20,9 @@ export interface ChatMessage {
   /** Estimated tokens from tool calls in this message (tool_use + tool_result blocks).
    *  Used only by contextSaturation — not included in semantic analysis content. */
   toolTokens?: number;
+  /** Exact API input token count for this turn (when provided by the model API).
+   *  When present, contextSaturation uses this instead of word-count estimation. */
+  inputTokens?: number;
 }
 
 // --- Drift Analysis ---

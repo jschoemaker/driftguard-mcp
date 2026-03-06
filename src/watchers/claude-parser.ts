@@ -10,6 +10,9 @@ export interface ParsedMessage {
   /** Estimated tokens from tool_use / tool_result blocks in this message.
    *  Used only for contextSaturation — not included in semantic content. */
   toolTokens?: number;
+  /** Exact API input token count for this turn (when provided by the model API).
+   *  When present, contextSaturation uses this instead of word-count estimation. */
+  inputTokens?: number;
 }
 
 interface ContentBlock {

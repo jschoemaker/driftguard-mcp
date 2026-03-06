@@ -5,7 +5,7 @@ if (command === 'watch') {
   run();
 } else if (command === 'setup') {
   const { setup } = require('./setup');
-  setup();
+  setup(process.argv.includes('--update'));
 } else {
   const { main } = require('./mcp-server');
   main().catch(console.error);
