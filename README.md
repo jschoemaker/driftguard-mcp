@@ -201,8 +201,8 @@ Both are plain JSON. All fields are optional.
 | Preset | Best for |
 |--------|----------|
 | `coding` | Focused coding sessions |
-| `research` | Research or planning — weights topic stability and goal alignment |
-| `brainstorm` | Brainstorming — relaxed topic scatter penalty |
+| `research` | Research or planning — weights goal alignment heavily |
+| `brainstorm` | Brainstorming — relaxed repetition and confidence penalties |
 | `strict` | Equal weight across all six factors |
 
 ### All options
@@ -244,3 +244,7 @@ driftguard-mcp watch
 | Gemini CLI | ✅ Supported — real token counts |
 | Codex CLI | ✅ Supported — estimated token counts |
 | Cursor | ✅ Supported (monitors Claude Code / Gemini / Codex sessions) |
+
+---
+
+If driftguard-mcp is useful, a [GitHub star](https://github.com/jschoemaker/driftguard-mcp) helps others find it.

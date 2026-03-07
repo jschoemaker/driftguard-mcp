@@ -1,6 +1,6 @@
 {
   "name": "driftguard-mcp",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Real-time AI conversation drift monitor — MCP server for Claude Code, Gemini CLI, Codex CLI, and Cursor",
   "main": "dist/bin.js",
   "bin": {
@@ -8,6 +8,7 @@
   },
   "files": [
     "dist/",
+    "scripts/",
     "README.md"
   ],
   "scripts": {
@@ -15,6 +16,7 @@
     "build": "node build.mjs",
     "build:watch": "node build.mjs --watch",
     "build:tsc": "tsc",
+    "postinstall": "node scripts/postinstall.js",
     "prepublishOnly": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",

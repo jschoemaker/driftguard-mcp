@@ -17,7 +17,7 @@ const storage  = config.storage.enabled
   : null;
 
 const server = new Server(
-  { name: 'driftcli', version: '0.1.0' },
+  { name: 'driftcli', version: '0.1.10' },
   { capabilities: { tools: {} } }
 );
 
@@ -153,7 +153,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   if (!sessionFile) {
-    return { content: [{ type: 'text', text: 'No active Claude Code session found.' }] };
+    return { content: [{ type: 'text', text: 'No active session found.' }] };
   }
 
   const adapter = resolver.getAdapter(sessionFile);
