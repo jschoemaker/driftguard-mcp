@@ -112,6 +112,10 @@ Score: 84/100 · 67 messages
 
 The score leads with a plain-English recommendation. The two bars that matter most — context depth and repetition — always appear. Others only show when they're contributing something meaningful.
 
+## See it in action
+
+[![driftguard-mcp demo](https://img.youtube.com/vi/NQcMkPxkcho/maxresdefault.jpg)](https://www.youtube.com/watch?v=NQcMkPxkcho)
+
 ---
 
 ## Handoff workflow
