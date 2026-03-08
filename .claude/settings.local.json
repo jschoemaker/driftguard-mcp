@@ -22,7 +22,8 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(driftguard-mcp:*)",
       "mcp__driftcli__get_handoff",
-      "WebFetch(domain:dev.to)"
+      "WebFetch(domain:dev.to)",
+      "Bash(rm:*)"
     ]
   }
 }

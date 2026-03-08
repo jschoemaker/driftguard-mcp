@@ -14,7 +14,7 @@ export function run() {
 
   const sessionFile = resolver.resolve();
   if (!sessionFile) {
-    console.error('No Claude Code session files found in ~/.claude/projects/');
+    console.error('No session files found. Is your AI CLI running?');
     console.error('Tip: set DRIFTCLI_SESSION_ID=<uuid> to pin a specific session.');
     process.exit(1);
   }

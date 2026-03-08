@@ -27,8 +27,8 @@ export interface DriftSnapshot {
  *   - <session-key> = JSONL filename without extension (the session UUID)
  *   - One snapshot per line, appended on each get_drift() call
  *
- * Disabled by default (storage.enabled = false in config).
- * Set storage.enabled = true in ~/.driftclirc to activate.
+ * Enabled by default (storage.enabled = true in config).
+ * Set storage.enabled = false in ~/.driftclirc to disable.
  */
 export class Storage {
   private readonly dir: string;

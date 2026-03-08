@@ -4,9 +4,8 @@
 // Calculates a 0-100 DriftScore based on heuristic analysis
 // of an AI chat session. No AI needed — pure math.
 //
-// v2: TF-IDF topic entropy, 3-gram repetition detection,
-//     Flesch-Kincaid readability in message decay,
-//     anchor drift (goal distance) as 7th factor.
+// 6-factor algorithm: contextSaturation, repetition, responseLengthCollapse,
+//     goalDistance, uncertaintySignals, confidenceDrift.
 // ============================================================
 
 import {

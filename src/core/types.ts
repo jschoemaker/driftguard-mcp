@@ -2,7 +2,7 @@
 // DriftGuard — Core Types
 // ============================================================
 
-export type Platform = 'chatgpt' | 'claude' | 'gemini';
+export type Platform = 'claude' | 'gemini' | 'codex';
 export type DriftLevel = 'fresh' | 'warming' | 'drifting' | 'polluted';
 export type MessageRole = 'user' | 'assistant';
 
@@ -82,52 +82,6 @@ export interface GoalDriftAnalysis {
   startToEndDrift: number;    // 0-100: drift from start → end specifically
 }
 
-// --- Session State ---
-
-export interface SessionState {
-  chatId: string;
-  tabId: number;
-  platform: Platform;
-  title?: string;
-  userGoal?: string;          // Optional: explicit goal set by user
-  goalTimestamp?: number;     // When user set the goal
-  messages: ChatMessage[];
-  currentDrift: DriftAnalysis;
-  startedAt: number;
-  lastMessageAt: number;
-}
-
-export interface ChatSummary {
-  chatId: string;
-  platform: Platform;
-  title?: string;
-  messageCount: number;
-  driftScore: number;
-  driftLevel: DriftLevel;
-  lastMessageAt: number;
-}
-
-// --- Chrome Message Passing ---
-
-export type BGMessage =
-  | { type: 'NEW_MESSAGE'; payload: ChatMessage }
-  | { type: 'GET_SESSION'; payload: { chatId: string } }
-  | { type: 'RESET_SESSION'; payload: { chatId: string } }
-  | { type: 'GET_DRIFT'; payload: { chatId: string } }
-  | { type: 'UPDATE_WEIGHTS'; payload: DriftWeights }
-  | { type: 'GET_ALL_SESSIONS' }
-  | { type: 'GET_CHAT_FOR_TAB'; payload: { tabId: number } }
-  | { type: 'SET_GOAL'; payload: { chatId: string; goal: string } }
-  | { type: 'CLEAR_GOAL'; payload: { chatId: string } };
-
-export type BGResponse =
-  | { type: 'SESSION'; payload: SessionState | null }
-  | { type: 'DRIFT'; payload: DriftAnalysis }
-  | { type: 'OK' }
-  | { type: 'ERROR'; message: string }
-  | { type: 'SESSION_LIST'; payload: ChatSummary[] }
-  | { type: 'CHAT_ID'; payload: string | null };
-
 // --- Drift Thresholds ---
 
 export const DRIFT_THRESHOLDS = {
@@ -136,13 +90,6 @@ export const DRIFT_THRESHOLDS = {
   drifting: { min: 61, max: 80 },
   polluted: { min: 81, max: 100 },
 } as const;
-
-export const BADGE_COLORS: Record<DriftLevel, string> = {
-  fresh: '#22c55e',
-  warming: '#eab308',
-  drifting: '#ef4444',
-  polluted: '#1f2937',
-};
 
 // --- Utility ---
 
