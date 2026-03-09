@@ -15,7 +15,7 @@ npm install -g driftguard-mcp
 driftguard-mcp setup
 ```
 
-`setup` automatically configures all supported AI CLIs on your machine. Restart your AI CLI(s) after running it.
+`setup` automatically configures all supported AI CLIs on your machine. **You must restart your AI CLI(s) after running it** — the MCP server only loads at startup.
 
 <details>
 <summary>Manual config</summary>
@@ -94,6 +94,7 @@ Call these tools from any session:
   Repetition            ██░░░░░░░░   15
 
 Score: 12/100 · 14 messages
+Session size: 56,210 input tokens total
 ```
 
 **Session that needs a reset:**
@@ -106,6 +107,7 @@ Score: 12/100 · 14 messages
   Length collapse       █████░░░░░   48
 
 Score: 84/100 · 67 messages
+Session size: 176,432 input tokens total
 
 → Call get_handoff() to write handoff.md before starting fresh.
 ```
@@ -157,7 +159,7 @@ The score is driven primarily by two signals that reliably predict context degra
 
 | Factor | Weight | What it measures |
 |--------|--------|-----------------|
-| **Context depth** | 37% | Token volume in the session (real API counts for Claude and Gemini) |
+| **Context depth** | 37% | % of context window used — real token counts / window size for all adapters |
 | **Repetition** | 37% | 3-gram overlap across recent assistant responses — the model recycling its own output |
 | Response length collapse | 15% | Assistant responses getting shorter over time |
 | Goal distance | 8% | Vocabulary drift from your stated goal (pass `goal` param to activate) |
@@ -240,9 +242,9 @@ driftguard-mcp watch
 
 | CLI | Status |
 |-----|--------|
-| Claude Code | ✅ Supported — real token counts |
-| Gemini CLI | ✅ Supported — real token counts |
-| Codex CLI | ✅ Supported — estimated token counts |
+| Claude Code | ✅ Supported — real token counts, 200k window |
+| Gemini CLI | ✅ Supported — real token counts, 1M window |
+| Codex CLI | ✅ Supported — real token counts, runtime window from session JSONL |
 | Cursor | ✅ Supported (monitors Claude Code / Gemini / Codex sessions) |
 
 ---

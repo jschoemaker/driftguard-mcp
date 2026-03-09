@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import { ParserAdapter, ParsedMessage } from './adapter';
+import { resolveHomeDir } from '../utils';
 
 interface UserMessagePayload {
   type: 'user_message';
@@ -57,6 +57,8 @@ export class CodexAdapter implements ParserAdapter {
     let index = 0;
     let pendingToolTokens = 0;
     let pendingInputTokens: number | undefined;
+    let pendingSessionInputTokens: number | undefined;
+    let pendingContextWindowTokens: number | undefined;
 
     for (const line of lines) {
       try {
@@ -68,9 +70,15 @@ export class CodexAdapter implements ParserAdapter {
 
         if (payload.type === 'token_count') {
           const tc = payload as TokenCountPayload;
-          const usage = tc.info?.total_token_usage;
-          if (usage?.input_tokens) pendingInputTokens = usage.input_tokens;
-          if (usage?.reasoning_output_tokens) pendingToolTokens += usage.reasoning_output_tokens;
+          const lastUsage = tc.info?.last_token_usage;
+          const totalUsage = tc.info?.total_token_usage;
+          // inputTokens = current-request context pressure (basis for context depth)
+          if (lastUsage?.input_tokens) pendingInputTokens = lastUsage.input_tokens;
+          // sessionInputTokens = cumulative session cost (basis for Session size display)
+          if (totalUsage?.input_tokens) pendingSessionInputTokens = totalUsage.input_tokens;
+          // contextWindowTokens = runtime denominator for context depth ratio
+          if (tc.info?.model_context_window) pendingContextWindowTokens = tc.info.model_context_window;
+          if (totalUsage?.reasoning_output_tokens) pendingToolTokens += totalUsage.reasoning_output_tokens;
           continue;
         }
 
@@ -91,6 +99,10 @@ export class CodexAdapter implements ParserAdapter {
         pendingToolTokens = 0;
         const inputTokens = pendingInputTokens;
         pendingInputTokens = undefined;
+        const sessionInputTokens = pendingSessionInputTokens;
+        pendingSessionInputTokens = undefined;
+        const contextWindowTokens = pendingContextWindowTokens;
+        pendingContextWindowTokens = undefined;
 
         messages.push({
           id: `codex-${index++}`,
@@ -99,10 +111,24 @@ export class CodexAdapter implements ParserAdapter {
           timestamp: isFinite(ts) ? ts : Date.now(),
           ...(toolTokens > 0 ? { toolTokens } : {}),
           ...(inputTokens !== undefined ? { inputTokens } : {}),
+          ...(sessionInputTokens !== undefined ? { sessionInputTokens } : {}),
+          ...(contextWindowTokens !== undefined ? { contextWindowTokens } : {}),
         });
       } catch {
         // skip malformed lines
       }
+    }
+
+    // Codex writes token_count AFTER agent_message (post-turn accounting).
+    // Patch trailing data onto the last message, but only safe fields:
+    // - sessionInputTokens: total cumulative cost — exactly what post-turn accounting measures
+    // - contextWindowTokens: model limit, stable across every event
+    // NOT inputTokens: a post-response last_token_usage includes output context too,
+    // which would inflate context depth beyond what was actually sent as input.
+    if (messages.length > 0) {
+      const last = messages[messages.length - 1];
+      if (pendingSessionInputTokens !== undefined) last.sessionInputTokens  = pendingSessionInputTokens;
+      if (pendingContextWindowTokens !== undefined) last.contextWindowTokens = pendingContextWindowTokens;
     }
 
     return messages;
@@ -110,7 +136,7 @@ export class CodexAdapter implements ParserAdapter {
 
   findLatest(): string | null {
     const codexDir = path.join(
-      process.env.DRIFTCLI_HOME ?? os.homedir(),
+      resolveHomeDir(),
       '.codex',
     );
 
@@ -118,18 +144,27 @@ export class CodexAdapter implements ParserAdapter {
 
     let latestFile: string | null = null;
     let latestTime = 0;
+    let filesScanned = 0;
+    const MAX_DEPTH = 10;
+    const MAX_FILES = 500;
 
-    const scan = (dir: string) => {
+    const scan = (dir: string, depth: number) => {
+      if (depth > MAX_DEPTH || filesScanned >= MAX_FILES) return;
       try {
         for (const entry of fs.readdirSync(dir)) {
+          if (filesScanned >= MAX_FILES) break;
           const fullPath = path.join(dir, entry);
           try {
             const stat = fs.statSync(fullPath);
+            if (stat.isSymbolicLink()) continue;
             if (stat.isDirectory()) {
-              scan(fullPath);
-            } else if (entry.endsWith('.jsonl') && stat.mtimeMs > latestTime) {
-              latestTime = stat.mtimeMs;
-              latestFile = fullPath;
+              scan(fullPath, depth + 1);
+            } else if (entry.endsWith('.jsonl')) {
+              filesScanned++;
+              if (stat.mtimeMs > latestTime) {
+                latestTime = stat.mtimeMs;
+                latestFile = fullPath;
+              }
             }
           } catch {
             continue;
@@ -140,7 +175,7 @@ export class CodexAdapter implements ParserAdapter {
       }
     };
 
-    scan(codexDir);
+    scan(codexDir, 0);
     return latestFile;
   }
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as path from 'path';
 import * as os from 'os';
+import * as fs from 'fs';
 import { parseJSONL, findLatestSession, cwdToProjectSlug, findSessionByCwd } from '../../src/watchers/claude-parser';
 
 const FIXTURES = path.resolve('tests/fixtures');
@@ -125,9 +126,14 @@ describe('findLatestSession', () => {
   });
 
   it('returns null when the .claude/projects directory does not exist', () => {
-    process.env.DRIFTCLI_HOME = path.join(os.tmpdir(), `no-such-dir-${Date.now()}`);
+    // Use a valid but empty temp dir so resolveHomeDir() accepts it,
+    // but there are no .claude/projects inside it.
+    const emptyHome = path.join(os.tmpdir(), `empty-home-${Date.now()}`);
+    fs.mkdirSync(emptyHome, { recursive: true });
+    process.env.DRIFTCLI_HOME = emptyHome;
     const result = findLatestSession();
     expect(result).toBeNull();
+    fs.rmdirSync(emptyHome);
   });
 });
 

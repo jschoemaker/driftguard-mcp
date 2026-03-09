@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
+import { resolveHomeDir } from '../utils';
 
 export interface ParsedMessage {
   id: string;
@@ -13,6 +13,12 @@ export interface ParsedMessage {
   /** Exact API input token count for this turn (when provided by the model API).
    *  When present, contextSaturation uses this instead of word-count estimation. */
   inputTokens?: number;
+  /** Cumulative session-wide input token cost (Codex: total_token_usage.input_tokens).
+   *  Used for the "Session size" display line; not used for context-depth scoring. */
+  sessionInputTokens?: number;
+  /** Runtime context window size in tokens (Codex: model_context_window).
+   *  When present, Codex uses inputTokens/contextWindowTokens as context-depth basis. */
+  contextWindowTokens?: number;
 }
 
 interface ContentBlock {
@@ -145,7 +151,7 @@ export function parseJSONL(filePath: string): ParsedMessage[] {
  */
 function claudeProjectsDir(): string {
   // DRIFTCLI_HOME overrides os.homedir() — used in tests and non-standard setups
-  return path.join(process.env.DRIFTCLI_HOME ?? os.homedir(), '.claude', 'projects');
+  return path.join(resolveHomeDir(), '.claude', 'projects');
 }
 
 export function findSessionByUUID(sessionId: string): string | null {

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import { DriftAnalysis } from './core/types';
+import { resolveHomeDir } from './utils';
 
 // ============================================================
 // Types
@@ -35,7 +35,7 @@ export class Storage {
 
   constructor(directory?: string) {
     this.dir = directory ?? path.join(
-      process.env.DRIFTCLI_HOME ?? os.homedir(),
+      resolveHomeDir(),
       '.driftcli',
       'history',
     );
@@ -43,6 +43,9 @@ export class Storage {
 
   /** Derive the storage path for a given session key. */
   sessionPath(sessionKey: string): string {
+    if (!/^[a-zA-Z0-9_-]{1,100}$/.test(sessionKey)) {
+      throw new Error(`[driftcli] Invalid session key: "${sessionKey}"`);
+    }
     return path.join(this.dir, `${sessionKey}.jsonl`);
   }
 

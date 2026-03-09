@@ -23,6 +23,12 @@ export interface ChatMessage {
   /** Exact API input token count for this turn (when provided by the model API).
    *  When present, contextSaturation uses this instead of word-count estimation. */
   inputTokens?: number;
+  /** Cumulative session-wide input token cost (Codex: total_token_usage.input_tokens).
+   *  Used for the "Session size" display line only. */
+  sessionInputTokens?: number;
+  /** Runtime context window size in tokens (Codex: model_context_window).
+   *  When present, Codex uses inputTokens/contextWindowTokens as context-depth basis. */
+  contextWindowTokens?: number;
 }
 
 // --- Drift Analysis ---
@@ -37,21 +43,21 @@ export interface DriftFactors {
 }
 
 export interface DriftWeights {
-  contextSaturation: number;      // default 0.37 — most reliable: real token depth
-  uncertaintySignals: number;     // default 0.02 — high precision, low recall
-  repetition: number;             // default 0.37 — most reliable: model recycling output
-  goalDistance: number;           // default 0.08 — lexical proxy, noisy
-  confidenceDrift: number;        // default 0.01 — trend signal, supporting only
-  responseLengthCollapse: number; // default 0.15 — reliable symptom of degradation
+  contextSaturation: number;      // 0.30 — LMSYS: +0.800 correlation with turn index
+  uncertaintySignals: number;     // 0.12 — Arena: underweighted at 0.02, raised
+  repetition: number;             // 0.25 — Arena + LMSYS: reliable recycling signal
+  goalDistance: number;           // 0.22 — Arena: strongest pairwise signal (+1.364 delta)
+  confidenceDrift: number;        // 0.03 — weak but non-zero; LMSYS: +0.096
+  responseLengthCollapse: number; // 0.08 — LMSYS: +0.170; Arena can't measure (short sessions)
 }
 
 export const DEFAULT_WEIGHTS: DriftWeights = {
-  contextSaturation: 0.37,
-  uncertaintySignals: 0.02,
-  repetition: 0.37,
-  goalDistance: 0.08,
-  confidenceDrift: 0.01,
-  responseLengthCollapse: 0.15,
+  contextSaturation: 0.30,
+  uncertaintySignals: 0.12,
+  repetition: 0.25,
+  goalDistance: 0.22,
+  confidenceDrift: 0.03,
+  responseLengthCollapse: 0.08,
 };
 
 export interface DriftAnalysis {

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import { ParserAdapter, ParsedMessage } from './adapter';
+import { resolveHomeDir } from '../utils';
 
 interface GeminiToolCall {
   id: string;
@@ -107,6 +107,7 @@ export class GeminiAdapter implements ParserAdapter {
         timestamp: isFinite(ts) ? ts : Date.now(),
         ...(toolTokens > 0 ? { toolTokens } : {}),
         ...(inputTokens !== undefined ? { inputTokens } : {}),
+        ...(inputTokens !== undefined ? { contextWindowTokens: 1_000_000 } : {}),
       });
     }
 
@@ -115,7 +116,7 @@ export class GeminiAdapter implements ParserAdapter {
 
   findLatest(): string | null {
     const geminiTmp = path.join(
-      process.env.DRIFTCLI_HOME ?? os.homedir(),
+      resolveHomeDir(),
       '.gemini',
       'tmp',
     );

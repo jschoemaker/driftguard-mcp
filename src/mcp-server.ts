@@ -17,7 +17,7 @@ const storage  = config.storage.enabled
   : null;
 
 const server = new Server(
-  { name: 'driftcli', version: '0.1.10' },
+  { name: 'driftcli', version: '0.1.12' },
   { capabilities: { tools: {} } }
 );
 
@@ -25,7 +25,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: 'get_drift',
-      description: 'Returns the current drift score and factor breakdown for the active Claude Code session. Call this to check if the conversation context is degrading. Optionally pass a "goal" string to anchor goalDistance scoring to a specific objective.',
+      description: 'Returns the current drift score and all 6 factor scores for the active session. Call this to check if the conversation context is degrading. Optionally pass a "goal" string to anchor goalDistance scoring to a specific objective. When context depth or repetition is high, a handoff suggestion is included automatically.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -38,7 +38,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'get_handoff',
-      description: 'Generates a handoff prompt summarizing the current session state. Use this when drift score is high (>60) to help start a fresh context.',
+      description: 'Returns a structured prompt for the AI to write a handoff.md file in the current directory. The AI uses its full session context to fill in what was accomplished, current state, files modified, and next steps. Use this when drift is high (>60) before starting a fresh session.',
       inputSchema: { type: 'object', properties: {} },
     },
     {
@@ -64,6 +64,7 @@ function buildDriftOutput(
   messageCount: number,
   trendLine: string,
   adapterTag: string,
+  sessionSize?: number,
 ): string {
   const { factors, score } = analysis;
 
@@ -110,12 +111,16 @@ function buildDriftOutput(
     `Score: ${score}/100 · ${messageCount} messages${adapterTag}`,
   ];
 
+  if (sessionSize !== undefined) {
+    lines.push(`Session size: ${sessionSize.toLocaleString('en-US')} input tokens total`);
+  }
+
   if (trendLine) lines.push(trendLine);
 
   // Auto-trigger handoff suggestion when primary signals are high — independent of composite score
   const shouldHandoff = factors.contextSaturation > 60 || factors.repetition > 50;
   if (shouldHandoff) {
-    lines.push('', '→ Call get_handoff() to write handoff.md before starting fresh.');
+    lines.push('', '→ Call get_handoff() to get a structured prompt for writing handoff.md before starting fresh.');
   }
 
   return lines.join('\n');
@@ -173,15 +178,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     platform: 'claude' as const,
     tabId: 0,
     chatId: 'cli',
-    ...(m.toolTokens !== undefined ? { toolTokens: m.toolTokens } : {}),
   }));
 
-  const goal = typeof request.params.arguments?.goal === 'string'
+  const rawGoal = typeof request.params.arguments?.goal === 'string'
     ? request.params.arguments.goal
     : undefined;
+  const goal = rawGoal && rawGoal.length > 5000 ? rawGoal.slice(0, 5000) : rawGoal;
 
   const analysis = calculateDrift(chatMessages, config.weights, goal);
   const adapterTag = adapter.name !== 'claude' ? ` (${adapter.name})` : '';
+
+  // Session size: Codex uses sessionInputTokens (cumulative cost); Claude/Gemini use
+  // the latest inputTokens value (which already represents cumulative context at that turn).
+  const sessionSize = (() => {
+    const codexSize = [...chatMessages].reverse().find(m => (m.sessionInputTokens ?? 0) > 0)?.sessionInputTokens;
+    if (codexSize !== undefined) return codexSize;
+    return [...chatMessages].reverse().find(m => (m.inputTokens ?? 0) > 0)?.inputTokens;
+  })();
 
   if (request.params.name === 'get_drift') {
     let trendLine = '';
@@ -195,10 +208,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const arrow = delta > 10 ? '↗' : delta < -10 ? '↘' : '→';
         const sign = delta >= 0 ? '+' : '';
         trendLine = `Trend (last ${scores.length}): ${sparkline(scores)}  ${sign}${delta} over ${scores.length} checks ${arrow}`;
+      } else {
+        trendLine = `Trend: building up (${snapshots.length}/3 checks recorded)`;
       }
     }
 
-    return { content: [{ type: 'text', text: buildDriftOutput(analysis, messages.length, trendLine, adapterTag) }] };
+    return { content: [{ type: 'text', text: buildDriftOutput(analysis, messages.length, trendLine, adapterTag, sessionSize) }] };
   }
 
   if (request.params.name === 'get_handoff') {

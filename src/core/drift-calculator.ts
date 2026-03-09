@@ -99,42 +99,59 @@ export function calculateDrift(
  * significantly simpler over time, it signals context degradation
  * (the model falls back to generic, simplified answers).
  */
-function calcMessageDecay(messages: ChatMessage[]): number {
-  let totalTokens = 0;
+/** Claude Code always runs on a 200k-token context window. Used as the denominator
+ *  when the session JSONL does not expose the window size (Claude, Gemini). */
+const CLAUDE_CONTEXT_WINDOW = 200_000;
 
-  // Use exact API input token count when available (e.g. Gemini provides tokens.input).
-  // Take the latest value — it represents the cumulative context size at that turn.
+function calcMessageDecay(messages: ChatMessage[]): number {
+  // Prefer a direct ratio (inputTokens / window) over the log heuristic whenever
+  // we have real token counts, giving a true % of the context window used.
+
+  // Codex: runtime window size comes from model_context_window in the JSONL.
+  const latestCodexMsg = [...messages]
+    .reverse()
+    .find(m => m.contextWindowTokens && (m.inputTokens ?? 0) > 0);
+
+  if (latestCodexMsg?.contextWindowTokens && latestCodexMsg.inputTokens !== undefined) {
+    const used = latestCodexMsg.inputTokens / latestCodexMsg.contextWindowTokens;
+    let score = Math.round(Math.min(100, used * 100));
+    if (messages.length > 50) score += 10;
+    else if (messages.length > 25) score += 5;
+    score += calcReadabilityDecay(messages);
+    return Math.min(100, score);
+  }
+
+  // Claude / Gemini: JSONL provides exact input token counts but not the window size.
+  // Use 200k as the denominator — Claude Code's fixed context window.
   const latestInputTokens = [...messages]
     .reverse()
     .find(m => (m.inputTokens ?? 0) > 0)
     ?.inputTokens;
 
   if (latestInputTokens !== undefined) {
-    totalTokens = latestInputTokens;
-  } else {
-    for (const msg of messages) {
-      const words = msg.content.split(/\s+/).filter(w => w.length > 0).length;
-      const hasCode = msg.content.includes('```');
-      const tokenEstimate = Math.round(words * 1.3 * (hasCode ? 1.5 : 1));
-      totalTokens += tokenEstimate + (msg.toolTokens ?? 0);
-    }
+    const used = latestInputTokens / CLAUDE_CONTEXT_WINDOW;
+    let score = Math.round(Math.min(100, used * 100));
+    if (messages.length > 50) score += 10;
+    else if (messages.length > 25) score += 5;
+    score += calcReadabilityDecay(messages);
+    return Math.min(100, score);
+  }
+
+  // Fallback: no token data — estimate from word count.
+  let totalTokens = 0;
+  for (const msg of messages) {
+    const words = msg.content.split(/\s+/).filter(w => w.length > 0).length;
+    const hasCode = msg.content.includes('```');
+    totalTokens += Math.round(words * 1.3 * (hasCode ? 1.5 : 1)) + (msg.toolTokens ?? 0);
   }
 
   if (totalTokens < 500) return 0;
 
   let score = Math.min(100, Math.round(15 * Math.log(totalTokens / 1500)));
   if (score < 0) score = 0;
-
-  // Message count bonus for rapid-fire conversations
   if (messages.length > 50) score += 10;
   else if (messages.length > 25) score += 5;
-
-  // Flesch-Kincaid readability decay bonus
-  // Compare early vs late assistant messages — if readability drops
-  // significantly, the AI is producing simpler/more generic responses
-  const readabilityPenalty = calcReadabilityDecay(messages);
-  score += readabilityPenalty;
-
+  score += calcReadabilityDecay(messages);
   return Math.min(100, score);
 }
 
@@ -338,11 +355,19 @@ function calcResponseLengthCollapse(messages: ChatMessage[]): number {
   const earlyMsgs = assistantMsgs.slice(0, quarter);
   const lateMsgs = assistantMsgs.slice(-quarter);
 
-  const avgWords = (msgs: ChatMessage[]) =>
-    msgs.reduce((sum, m) => sum + m.content.split(/\s+/).filter(w => w.length > 0).length, 0) / msgs.length;
+  const wordCounts = (msgs: ChatMessage[]) =>
+    msgs.map(m => m.content.split(/\s+/).filter(w => w.length > 0).length);
 
-  const earlyAvg = avgWords(earlyMsgs);
-  const lateAvg = avgWords(lateMsgs);
+  // Trim top outlier (e.g. one giant code dump skewing early baseline)
+  const trimmedAvg = (counts: number[]) => {
+    if (counts.length <= 2) return counts.reduce((a, b) => a + b, 0) / counts.length;
+    const sorted = counts.slice().sort((a, b) => a - b);
+    const trimmed = sorted.slice(0, -1); // drop max
+    return trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
+  };
+
+  const earlyAvg = trimmedAvg(wordCounts(earlyMsgs));
+  const lateAvg = trimmedAvg(wordCounts(lateMsgs));
 
   if (earlyAvg === 0) return 0;
 

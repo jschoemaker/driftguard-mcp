@@ -61,7 +61,7 @@ export function run() {
         storage.record(sessionKey, analysis);
       }
     } catch (err) {
-      // Don't crash the watcher on transient read errors
+      console.warn(`[driftcli] Watcher error: ${err instanceof Error ? err.message : err}`);
     }
   }
 

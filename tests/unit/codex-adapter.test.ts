@@ -89,4 +89,56 @@ describe('CodexAdapter.parse', () => {
     expect(messages.length).toBe(0);
     fs.unlinkSync(tmpFile);
   });
+
+  it('patches trailing token_count data onto the last message (post-turn accounting)', () => {
+    // Codex emits token_count AFTER agent_message — the last turn's data would otherwise be lost
+    const tmpFile = path.join(os.tmpdir(), `codex-trailing-${Date.now()}.jsonl`);
+    fs.writeFileSync(tmpFile, [
+      JSON.stringify({ timestamp: '2024-01-01T10:00:00Z', type: 'event_msg', payload: { type: 'user_message', message: 'hello' } }),
+      JSON.stringify({ timestamp: '2024-01-01T10:00:01Z', type: 'event_msg', payload: { type: 'agent_message', message: 'hi there' } }),
+      // token_count AFTER agent_message (trailing) — this is the last event
+      JSON.stringify({ timestamp: '2024-01-01T10:00:02Z', type: 'event_msg', payload: {
+        type: 'token_count',
+        info: {
+          last_token_usage:  { input_tokens: 8500 },
+          total_token_usage: { input_tokens: 8500 },
+          model_context_window: 128000,
+        },
+      }}),
+    ].join('\n') + '\n');
+
+    const messages = adapter.parse(tmpFile);
+    const last = messages[messages.length - 1];
+    // inputTokens NOT patched from trailing event (post-response data would inflate context depth)
+    expect(last.inputTokens).toBeUndefined();
+    expect(last.sessionInputTokens).toBe(8500);
+    expect(last.contextWindowTokens).toBe(128000);
+    fs.unlinkSync(tmpFile);
+  });
+
+  it('does not overwrite token data already set on a message by a preceding token_count', () => {
+    // If a token_count comes BEFORE the message, the message already has the data.
+    // The trailing patch should not overwrite it with a second token_count's data.
+    const tmpFile = path.join(os.tmpdir(), `codex-pre-token-${Date.now()}.jsonl`);
+    fs.writeFileSync(tmpFile, [
+      JSON.stringify({ timestamp: '2024-01-01T10:00:00Z', type: 'event_msg', payload: { type: 'user_message', message: 'hello' } }),
+      // token_count BEFORE agent_message
+      JSON.stringify({ timestamp: '2024-01-01T10:00:01Z', type: 'event_msg', payload: {
+        type: 'token_count',
+        info: {
+          last_token_usage:  { input_tokens: 5000 },
+          total_token_usage: { input_tokens: 5000 },
+          model_context_window: 128000,
+        },
+      }}),
+      JSON.stringify({ timestamp: '2024-01-01T10:00:02Z', type: 'event_msg', payload: { type: 'agent_message', message: 'hi' } }),
+      // No trailing token_count — pending cleared after agent_message
+    ].join('\n') + '\n');
+
+    const messages = adapter.parse(tmpFile);
+    const last = messages[messages.length - 1];
+    expect(last.inputTokens).toBe(5000);
+    expect(last.sessionInputTokens).toBe(5000);
+    fs.unlinkSync(tmpFile);
+  });
 });
