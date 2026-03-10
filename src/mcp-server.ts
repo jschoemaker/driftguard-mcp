@@ -17,7 +17,7 @@ const storage  = config.storage.enabled
   : null;
 
 const server = new Server(
-  { name: 'driftcli', version: '0.1.12' },
+  { name: 'driftcli', version: '0.1.13' },
   { capabilities: { tools: {} } }
 );
 

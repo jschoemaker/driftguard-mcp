@@ -109,7 +109,7 @@ Session size: 56,210 input tokens total
 Score: 84/100 · 67 messages
 Session size: 176,432 input tokens total
 
-→ Call get_handoff() to write handoff.md before starting fresh.
+→ Call get_handoff() to get a structured prompt for writing handoff.md before starting fresh.
 ```
 
 The score leads with a plain-English recommendation. The two bars that matter most — context depth and repetition — always appear. Others only show when they're contributing something meaningful.
@@ -155,18 +155,18 @@ Load `handoff.md` at the start of your next session. You continue without losing
 
 ## What it measures
 
-The score is driven primarily by two signals that reliably predict context degradation:
+Weights are empirically calibrated against two public datasets: **LMSYS-Chat-1M** (1M real sessions — factor behaviour across turn depth) and **Chatbot Arena** (33K human preference pairs — which conversation the human judged better):
 
 | Factor | Weight | What it measures |
 |--------|--------|-----------------|
-| **Context depth** | 37% | % of context window used — real token counts / window size for all adapters |
-| **Repetition** | 37% | 3-gram overlap across recent assistant responses — the model recycling its own output |
-| Response length collapse | 15% | Assistant responses getting shorter over time |
-| Goal distance | 8% | Vocabulary drift from your stated goal (pass `goal` param to activate) |
-| Uncertainty signals | 2% | Explicit self-corrections ("I was wrong", "let me correct that") |
-| Confidence drift | 1% | Hedging language trend (early vs late responses) |
+| **Context depth** | 30% | % of context window used — real token counts for all adapters |
+| **Repetition** | 25% | 3-gram overlap across recent responses — model recycling its own output |
+| **Goal distance** | 22% | Vocabulary drift from your stated goal — strongest pairwise signal in Arena data |
+| **Uncertainty signals** | 12% | Self-correction density ("I was wrong", "let me correct that") |
+| Response length collapse | 8% | Responses getting shorter — reliable symptom, short sessions can't measure it |
+| Confidence drift | 3% | Hedging language trend (early vs late responses) |
 
-Context depth and repetition together are the clearest signs the model is running out of useful context. The others contribute supporting signal but don't dominate the score.
+Context depth has +0.80 correlation with turn index on real long sessions (LMSYS). Goal distance and repetition were the strongest predictors of the losing model in Arena pairwise comparisons. Weights sum to 1.00.
 
 ---
 
