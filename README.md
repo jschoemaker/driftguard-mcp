@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/jschoemaker-driftguard-mcp-badge.png)](https://mseep.ai/app/jschoemaker-driftguard-mcp)
+
 # driftguard-mcp
 
 Real-time AI conversation drift monitor for Claude Code, Gemini CLI, Codex CLI, and Cursor.
